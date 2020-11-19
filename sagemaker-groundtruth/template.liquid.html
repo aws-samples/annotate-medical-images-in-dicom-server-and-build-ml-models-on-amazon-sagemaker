@@ -1,0 +1,204 @@
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+SPDX-License-Identifier: MIT-0 -->
+
+<!DOCTYPE HTML>
+<html>
+<head>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="https://assets.crowd.aws/crowd-html-elements.js"></script>
+</head>
+<body>
+
+<div id="document-text" style="display: none;">
+    {{ task.input.text }}
+</div>
+<div id="document-image" style="display:none;">
+    {{ task.input.taskObject }}
+</div>
+<div id="document-labels" style="display:none;">
+    {{ task.input.labels }}
+</div>
+
+<crowd-form>
+    <input name="labels" id="labels" type="hidden">
+
+    <!-- Prevent crowd-form from creating its own button -->
+    <crowd-button id="submit" form-action="submit" style="display: none;"></crowd-button>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div style="width:666;height:666;position:relative;color: white;display:inline-block;"
+                 oncontextmenu="return false"
+                 class='disable-selection noIbar'
+                 unselectable='on'
+                 onselectstart='return false;'
+                 onmousedown='return false;'>
+                <div class="row" 
+                     id="dicomImage"
+                     style="width:666;height:666;top:60px;left:30px; position:absolute">
+                </div>
+                <div class="row btn-toolbar" 
+                     id="mousemode"
+                     style="top:10px;left:30px; position:absolute">
+                    <button type="button" class="btn btn-secondary mr-1" id="Pan">Pan</button>
+                    <button type="button" class="btn btn-secondary mr-1" id="Zoom">Zoom</button>
+                    <button type="button" class="btn btn-secondary mr-1" id="Elliptical ROI">Elliptical ROI</button>
+                    <button type="button" class="btn btn-secondary mr-1" id="Rectangle ROI">Rectangle ROI</button>
+                    <button type="button" class="btn btn-secondary mr-1" id="Polygon ROI">Polygon ROI</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="dicomLabelsDropDown" style="padding-top: 100px; padding-right: 20px;">
+            <select class="custom-select" id="labelsSelection" name="labelsSelection"></select>
+        </div>
+        <div class="alert col-4" style="padding-top:80px;" role="alert">
+            <h4 class="alert-heading">Instructions - Inspect the DICOM image</h4>
+            <p>
+                The normal chest X-ray depicts clear lungs without any areas of abnormal opacification in the image. Bacterial pneumonia typically exhibits a focal lobar consolidation, whereas viral pneumonia manifests with a more diffuse ‘‘interstitial’’ pattern in both lungs.
+                Choose the appropriate label that best suits the image.
+            </p>
+        </div>
+        <hr>
+    </div>
+    </div>
+    </div>
+
+
+    <crowd-button id="submitButton" style="padding-left: 30px;padding-top:80px;padding-bottom:30px;">Submit</crowd-button>
+</crowd-form>
+
+</body>
+
+<script src="https://unpkg.com/cornerstone-core/dist/cornerstone.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cornerstone-math@0.1.8/dist/cornerstoneMath.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cornerstone-tools@2.1.0/dist/cornerstoneTools.min.js"></script>
+<script src="https://unpkg.com/dicom-parser@latest/dist/dicomParser.min.js"></script>
+<script src="https://unpkg.com/cornerstone-wado-image-loader/dist/cornerstoneWADOImageLoader.js"></script>
+<script src="https://unpkg.com/cornerstone-wado-image-loader@3.1.2/dist/cornerstoneWADOImageLoader.min.js"></script>
+
+<script>
+    cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
+    cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
+
+    cornerstoneWADOImageLoader.configure({
+        beforeSend: function(xhr) {
+            xhr.setRequestHeader('authorization', 'Basic b3J0aGFuYzpvcnRoYW5j');
+        }
+    });
+
+    function createLabelButtons() {
+        var str = document.getElementById('document-labels').innerText.trim();
+        var labels = str.split(",")
+
+        for (i = 0; i < labels.length; i++) {
+            document.getElementById('labelsSelection').innerHTML += '<option>' + labels[i] + '</option>'
+        }
+
+    }
+
+    var loaded = false;
+    function loadAndViewImage(imageId) {
+        var element = document.getElementById('dicomImage');
+
+        try {
+            var start = new Date().getTime();
+            cornerstone.loadAndCacheImage(imageId).then(function(image) {
+                console.log(image);
+                var viewport = cornerstone.getDefaultViewportForImage(element, image);
+                cornerstone.displayImage(element, image, viewport);
+                createLabelButtons();
+                if(loaded === false) {
+                    cornerstone.displayImage(element, image);
+                    cornerstoneTools.mouseInput.enable(element);
+                    cornerstoneTools.mouseWheelInput.enable(element);
+                    cornerstoneTools.pan.activate(element, 1); 
+                    cornerstoneTools.zoom.activate(element, 2);
+                    cornerstoneTools.wwwc.activate(element, 4); 
+                    cornerstoneTools.zoomWheel.activate(element); 
+                    cornerstoneTools.ellipticalRoi.enable(element);
+                    cornerstoneTools.rectangleRoi.enable(element);
+                    loaded = true;
+                }
+            }, function(err) {
+                alert(err);
+            });
+        }
+        catch(err) {
+            alert(err);
+        }
+    }
+
+    function downloadAndView() {
+        let url = document.getElementById('document-image').innerText.trim();
+
+        // prefix the url with wadouri: so cornerstone can find the image loader
+        url = "wadouri:" + url;
+        // image enable the dicomImage element and activate a few tools
+        loadAndViewImage(url);
+    }
+
+    var element = document.getElementById('dicomImage');
+    cornerstone.enable(element);
+
+    document.addEventListener("DOMContentLoaded", function(){
+        downloadAndView();
+    });
+
+    function disableAllTools() {
+        cornerstoneTools.pan.deactivate(element, 1); 
+        cornerstoneTools.zoom.deactivate(element, 1); 
+        cornerstoneTools.ellipticalRoi.deactivate(element, 1);
+        cornerstoneTools.rectangleRoi.deactivate(element, 1);
+        cornerstoneTools.freehand.deactivate(element, 1);
+    };
+    var toolstateROI=null;
+    document.getElementById("Pan").onclick = function() {
+        disableAllTools();
+        cornerstoneTools.pan.activate(element, 1); 
+    };
+    document.getElementById("Zoom").onclick = function() {
+        disableAllTools();
+        cornerstoneTools.zoom.activate(element, 1); 
+    };
+    document.getElementById("Elliptical ROI").onclick = function() {
+        disableAllTools();
+        cornerstoneTools.ellipticalRoi.activate(element, 1); 
+        toolstateROI = "ellipticalRoi";
+    };
+    document.getElementById("Rectangle ROI").onclick = function() {
+        disableAllTools();
+        cornerstoneTools.rectangleRoi.activate(element, 1); 
+        toolstateROI = "rectangleRoi";
+    };
+    document.getElementById("Polygon ROI").onclick = function() {
+        disableAllTools();
+        cornerstoneTools.freehand.activate(element, 1); 
+        toolstateROI ="freehand"
+    };
+
+
+    
+    document.getElementById('submitButton').onclick = function() {
+        document.querySelector('crowd-form').submit();
+    };
+    document.querySelector('crowd-form').onsubmit = function() {
+        let label = document.getElementById('labelsSelection');
+        let selectedLabel = label.options[label.selectedIndex].value;
+        if (toolstateROI==null){
+            var labelDict = {label: selectedLabel};
+        }
+        else if (toolstateROI=='freehand'){
+            var annotation = cornerstoneTools.getToolState(element, toolstateROI).data.pop();
+            var selectedROI = {vertices: annotation.handles};
+            var labelDict = {label: selectedLabel, ROI: selectedROI};
+        } else {
+            var annotation = cornerstoneTools.getToolState(element, toolstateROI).data.pop();
+            var selectedROI = {start: annotation.handles.start, end: annotation.handles.end, boundingBox: annotation.handles.textBox.boundingBox};
+            var labelDict = {label: selectedLabel, ROI: selectedROI};
+        }
+        document.getElementById('labels').value = JSON.stringify((labelDict));
+    };
+</script>
+</html>

@@ -25,7 +25,7 @@ You can either deploy using AWS CLI:
 Or using 1-click deployment button:
 [![launchstackbutton](Figures/launchstack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/template?stackName=OrthancOnAWSStack&templateURL=https://orthanc-on-aws.s3.amazonaws.com/orthanc-ec2-rds-cfn-tempalte.yaml)
 
-You can fill up the parameters like [this](Figures/CFNdeployment.png)
+You can fill up the parameters like ![this](Figures/CFNdeployment.png)
 
 ### Upload DICOM images to Orthanc 
 

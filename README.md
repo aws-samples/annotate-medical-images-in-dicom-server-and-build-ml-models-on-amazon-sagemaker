@@ -12,6 +12,8 @@ You will need two public subnets and two private subnets in a given Virtual Priv
 
 ### Deploy Orthanc DICOM Server on AWS ECS
 
+Here is the architecture diagraom of Orthanc on AWS ![diagram](Figures/orthanc-on-aws.jpg)  
+
 Go to nginx-orthanc-plugins-container folder. If you want to push the container image to [Amazon Elastic Container Registry](https://aws.amazon.com/ecr/), run the following script: `./build_and_push.sh`. 
 
 Alternatively, you can build docker container `docker build -t <tag> .` and push it to container repository manually. 
@@ -20,24 +22,26 @@ After pushing the container image to ECR, copy the image URI (like <AWS Account 
 
 You can either deploy using AWS CLI:
 
-`aws cloudformation deploy --capabilities CAPABILITY_IAM --template-file ./orthanc-ec2-rds-cfn-tempalte.yaml --stack-name <stackname> --parameter-overrides ImageUrl=<imageURI> InferenceModelS3Location=https://<S3bucketname>.s3.amazonaws.com/dicom_featurization_service.mar --profile <profilename>`
+`aws cloudformation deploy --capabilities CAPABILITY_IAM --template-file ./orthanc-ec2-rds-cfn-tempalte.yaml --stack-name <stackname> --parameter-overrides ConainerImageUrl=<imageURI> KeyName=<EC2 Key> ParameterVPCId=<VPC ID> PrivateSubnet1Id=<Private Subnet in AZ1> PrivateSubnet2Id=<Private Subnet in AZ2> PublicSubnet1Id=<Public Subnet in AZ1> PublicSubnet2Id=<Public Subnet in AZ2> --profile <profilename> ParameterLoadBalancerARN=<LB ARN or Empty value for creating new one> ParameterClusterName=<ECS Cluster Name or Empty value for creating new one>`
 
 Or using 1-click deployment button:
 [![launchstackbutton](Figures/launchstack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/template?stackName=OrthancOnAWSStack&templateURL=https://orthanc-on-aws.s3.amazonaws.com/orthanc-ec2-rds-cfn-tempalte.yaml)
 
 You can fill up the parameters like ![this](Figures/CFNdeployment.png)
 
+After the CFN stack is successfully created, the Orthanc endpoint URL will be available in the Outputs tab like ![this](Figures/CFNoutputs.png)
+
 ### Upload DICOM images to Orthanc 
 
 Orthanc supports WADO-RS with its [RESTful API](https://book.orthanc-server.com/users/rest.html). You can upload a DICOM image from local folder:
 
-`curl -u orthanc:orthanc -X POST https://orthanconawsloadbalancer-7f80f3d1ca7c01b4.elb.us-west-2.amazonaws.com/instances --data-binary @000046e4-e4d7f796-72c3dba4-8b67a485-0eea211d.dcm -k`
+`curl -u orthanc:orthanc -X POST https://<Orthanc URL>/instances --data-binary @<DICOM Image>.dcm -k`
 
 After uploaded, check the instance id assigned:
-`curl -u orthanc:orthanc https://orthanconawsloadbalancer-7f80f3d1ca7c01b4.elb.us-west-2.amazonaws.com/instances/ -k`
+`curl -u orthanc:orthanc https://<Orthanc URL>/instances -k`
 
 Then put this in source field of manifest.json
-`https://orthanconawsloadbalancer-7f80f3d1ca7c01b4.elb.us-west-2.amazonaws.com/instances/502b0a4b-5cb43965-7f092716-bd6fe6d6-4f7fc3ce`
+`https://<Orthanc URL>/instances/<DICOM Instance ID>`
 
 ### Deploy the pre and post labeling Lambda functions
 

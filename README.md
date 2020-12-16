@@ -16,11 +16,13 @@ Go to nginx-orthanc-plugins-container folder. If you want to push the container 
 
 Alternatively, you can build docker container `docker build -t <tag> .` and push it to container repository manually. 
 
-After pushing the container image to ECR, copy the image URI that will be used in the following Cloudformation deployment.
+After pushing the container image to ECR, copy the image URI (like <AWS Account ID>.dkr.ecr.<AWS Region>.amazonaws.com/nginx-orthanc-plugins]) that will be used in the following Cloudformation deployment.
 
 You can either go to AWS Console, select Cloudformation service, deploy the template orthanc-ec2-rds-cfn-tempalte.yaml. 
 
-Or
+Or you can deploy using AWS CLI:
+
+`aws cloudformation deploy --capabilities CAPABILITY_IAM --template-file ./orthanc-ec2-rds-cfn-tempalte.yaml --stack-name <stackname> --parameter-overrides ImageUrl=<imageURI> InferenceModelS3Location=https://<S3bucketname>.s3.amazonaws.com/dicom_featurization_service.mar --profile <profilename>`
 
 ### Upload DICOM images to Orthanc 
 

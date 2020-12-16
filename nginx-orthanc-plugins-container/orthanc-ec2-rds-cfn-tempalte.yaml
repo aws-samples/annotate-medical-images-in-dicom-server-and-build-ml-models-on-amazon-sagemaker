@@ -18,11 +18,17 @@ Parameters:
     Description: The url of a docker image that contains the application process that will handle the traffic for this service
     Default: flamingofugang/nginx-orthanc-plugins:latest
     Type: String
-  ParameterSubnet1Id:
-    Description: SubnetId, for Availability Zone 1 in the region in your VPC
+  PublicSubnet1Id:
+    Description: PublicSubnetId, for Availability Zone 1 in the region in your VPC
     Type: AWS::EC2::Subnet::Id
-  ParameterSubnet2Id:
-    Description: SubnetId, for Availability Zone 2 in the region in your VPC
+  PublicSubnet2Id:
+    Description: PublicSubnetId, for Availability Zone 2 in the region in your VPC
+    Type: AWS::EC2::Subnet::Id
+  PrivateSubnet1Id:
+    Description: PrivateSubnetId, for Availability Zone 1 in the region in your VPC
+    Type: AWS::EC2::Subnet::Id
+  PrivateSubnet2Id:
+    Description: PrivateSubnetId, for Availability Zone 2 in the region in your VPC
     Type: AWS::EC2::Subnet::Id
   ParameterVPCId:
     Description: ID of the VPC
@@ -110,8 +116,8 @@ Resources:
     Properties:
       DBSubnetGroupDescription: DBSubnetGroup for RDS instances
       SubnetIds:
-        - !Ref ParameterSubnet1Id
-        - !Ref ParameterSubnet2Id
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
   OrthancRDSNetwork:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -189,8 +195,8 @@ Resources:
       Name: orthanconawsLoadBalancer
       Scheme: internet-facing
       Subnets:
-        - !Ref 'ParameterSubnet1Id'
-        - !Ref 'ParameterSubnet2Id'
+        - !Ref 'PublicSubnet1Id'
+        - !Ref 'PublicSubnet2Id'
       Tags:
         - Key: com.docker.compose.project
           Value: orthanconaws
@@ -226,8 +232,8 @@ Resources:
           SecurityGroups:
             - !Ref 'OrthancServerNetwork'
           Subnets:
-            - !Ref 'ParameterSubnet1Id'
-            - !Ref 'ParameterSubnet2Id'
+            - !Ref 'PublicSubnet1Id'
+            - !Ref 'PublicSubnet2Id'
       PropagateTags: SERVICE
       SchedulingStrategy: REPLICA
       ServiceRegistries:
@@ -379,8 +385,8 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       VPCZoneIdentifier:
-        - !Ref 'ParameterSubnet1Id'
-        - !Ref 'ParameterSubnet2Id'
+        - !Ref 'PublicSubnet1Id'
+        - !Ref 'PublicSubnet2Id'
       LaunchConfigurationName: !Ref 'ContainerInstances'
       MinSize: '2'
       MaxSize: '4'

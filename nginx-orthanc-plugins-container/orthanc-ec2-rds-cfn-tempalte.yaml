@@ -147,7 +147,11 @@ Resources:
       EngineVersion: 11
       MasterUsername: postgres
       MasterUserPassword: pgpassword
-      PubliclyAccessible: True
+      PubliclyAccessible: False
+      MultiAZ: True
+      StorageEncrypted: true
+      EnableIAMDatabaseAuthentication: true
+      EnableCloudwatchLogsExports: [postgresql]
       Tags:
         - Key: com.docker.compose.project
           Value: "RDS PostgreSQL for Orthanc"

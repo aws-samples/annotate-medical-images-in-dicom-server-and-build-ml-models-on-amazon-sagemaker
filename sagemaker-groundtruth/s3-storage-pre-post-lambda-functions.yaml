@@ -1,5 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: AWS CloudFormation to deploy Lambdas
+Parameters:
+  PreLabelLambdaSourceEndpointURL:
+    Type: String 
+    Description: The Endpoint URL of PACS used by PreLabel Lambda function that will be used to construct the source of DICOM image
+
 Resources:
   ConsolidationLambdaSMGTExecutionRole:
     Type: AWS::IAM::Role
@@ -40,6 +45,7 @@ Resources:
       Code:
         ZipFile: |
             import json
+            import os
             import base64
             from urllib.parse import urlparse
             import boto3
@@ -49,6 +55,7 @@ Resources:
                 source_ref = event['dataObject']['source-ref'] if "source-ref" in event['dataObject'] else None
                 labels = event['dataObject']['labels'] if "labels" in event['dataObject'] else None
                 task_object = source if source is not None else source_ref
+                task_object = '/'.join([os.environ['EndpointURL'], 'instances', task_object, 'file'])
 
                 # Build response object
                 output = {
@@ -71,6 +78,9 @@ Resources:
       Handler: index.lambda_handler
       Runtime: python3.6
       MemorySize: 128
+      Environment:
+        Variables:
+          EndpointURL: !Ref PreLabelLambdaSourceEndpointURL
   PostLabelTaskLambda:
     Type: AWS::Lambda::Function
     DependsOn:

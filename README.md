@@ -4,10 +4,6 @@
 
 ### Pre-requisite
 
-Go to AWS Console and create a new [Cloud9 environment(https://aws.amazon.com/cloud9/). You can [configure the SSH connection to GitHub](https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent) (Optional). Git clone this repository.
-
-Configure AWS Command Line Interface (CLI) through `aws configure`
-
 You will need two public subnets and two private subnets in a given Virtual Private Cloud (VPC). You can deploy the VPC network infrastructure using this [CloudFormation template](https://docs.aws.amazon.com/codebuild/latest/userguide/cloudformation-vpc-template.html) (Optional)
 
 ### Deploy Orthanc DICOM Server on AWS ECS
@@ -46,7 +42,6 @@ Then put instance IDs in source field of manifest.json. Assuming here is the out
    "af163634-5f8009c8-a941f2a2-4d108bea-119181b5",  
    "3e9562ab-3bd7b304-e003d1f8-0fe2e8f5-e6af3f36"   
 ]`  
-
 The manifest.json file will look at [this](https://github.com/aws-samples/annotate-medical-images-in-dicom-server-and-build-ml-models-on-amazon-sagemaker/blob/main/sagemaker-groundtruth/manifest.json).
 
 
@@ -55,6 +50,7 @@ The manifest.json file will look at [this](https://github.com/aws-samples/annota
 click the button below to deploy both PreLabelTaskLambda and PostLabelTaskLambda functions
 [![launchstackbutton](Figures/launchstack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/template?stackName=SageMakerGroundTruthLambdaFunctions&templateURL=https://orthanc-on-aws.s3.amazonaws.com/orthanc-ec2-rds-cfn-tempalte.yaml)
 
+Fill the parameter PreLabelLambdaSourceEndpointURL with the Orthanc endpoint URL from previous step.
 
 ### Create Custom Label Job in SageMaker GroundTruth
 

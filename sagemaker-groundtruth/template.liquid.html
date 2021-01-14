@@ -26,8 +26,15 @@ SPDX-License-Identifier: MIT-0 -->
     <!-- Prevent crowd-form from creating its own button -->
     <crowd-button id="submit" form-action="submit" style="display: none;"></crowd-button>
 
+    <div class="row" style="padding-left:60px;padding-top:20px;padding-right:60px;" role="alert">
+        <h4 class="alert-heading">Instructions - Annotate the DICOM image</h4>
+        <p>
+            Choose the appropriate label that best suits the image. Highlight the Region Of Interest (ROI) using different shape.
+            For instances, the normal chest X-ray depicts clear lungs without any areas of abnormal opacification in the image. Bacterial pneumonia typically exhibits a focal lobar consolidation, whereas viral pneumonia manifests with a more diffuse ‘‘interstitial’’ pattern in both lungs.
+        </p>
+    </div>
     <div class="row">
-        <div class="col-md-6">
+        <div class="col">
             <div style="width:666;height:666;position:relative;color: white;display:inline-block;"
                  oncontextmenu="return false"
                  class='disable-selection noIbar'
@@ -49,24 +56,9 @@ SPDX-License-Identifier: MIT-0 -->
                 </div>
             </div>
         </div>
-        
-        <div id="dicomLabelsDropDown" style="padding-top: 100px; padding-right: 20px;">
-            <select class="custom-select" id="labelsSelection" name="labelsSelection"></select>
-        </div>
-        <div class="alert col-4" style="padding-top:80px;" role="alert">
-            <h4 class="alert-heading">Instructions - Inspect the DICOM image</h4>
-            <p>
-                The normal chest X-ray depicts clear lungs without any areas of abnormal opacification in the image. Bacterial pneumonia typically exhibits a focal lobar consolidation, whereas viral pneumonia manifests with a more diffuse ‘‘interstitial’’ pattern in both lungs.
-                Choose the appropriate label that best suits the image.
-            </p>
-        </div>
-        <hr>
+        <div class="col" id="labelsSelection" name="labelsSelection" style="padding-top: 100px; padding-right: 20px;"></div>
     </div>
-    </div>
-    </div>
-
-
-    <crowd-button id="submitButton" style="padding-left: 30px;padding-top:80px;padding-bottom:30px;">Submit</crowd-button>
+    <crowd-button id="submitButton" style="padding-left:30px;padding-top:60px;">Submit</crowd-button>
 </crowd-form>
 
 </body>
@@ -93,18 +85,23 @@ SPDX-License-Identifier: MIT-0 -->
         var labels = str.split(",")
 
         for (i = 0; i < labels.length; i++) {
-            document.getElementById('labelsSelection').innerHTML += '<option>' + labels[i] + '</option>'
+            document.getElementById('labelsSelection').innerHTML += '<label class="container">'+labels[i]+'<input type="checkbox" name="disease" value="'+labels[i]+'"><span class="checkmark"></span></label>'
         }
 
     }
 
     var loaded = false;
-    function loadAndViewImage(imageId) {
+    function downloadAndView() {
+        let url = document.getElementById('document-image').innerText.trim();
+
+        // prefix the url with wadouri: so cornerstone can find the image loader
+        url = "wadouri:" + url;
+        // image enable the dicomImage element and activate a few tools
         var element = document.getElementById('dicomImage');
 
         try {
             var start = new Date().getTime();
-            cornerstone.loadAndCacheImage(imageId).then(function(image) {
+            cornerstone.loadAndCacheImage(url).then(function(image) {
                 console.log(image);
                 var viewport = cornerstone.getDefaultViewportForImage(element, image);
                 cornerstone.displayImage(element, image, viewport);
@@ -128,15 +125,6 @@ SPDX-License-Identifier: MIT-0 -->
         catch(err) {
             alert(err);
         }
-    }
-
-    function downloadAndView() {
-        let url = document.getElementById('document-image').innerText.trim();
-
-        // prefix the url with wadouri: so cornerstone can find the image loader
-        url = "wadouri:" + url;
-        // image enable the dicomImage element and activate a few tools
-        loadAndViewImage(url);
     }
 
     var element = document.getElementById('dicomImage');
@@ -185,20 +173,94 @@ SPDX-License-Identifier: MIT-0 -->
     };
     document.querySelector('crowd-form').onsubmit = function() {
         let label = document.getElementById('labelsSelection');
-        let selectedLabel = label.options[label.selectedIndex].value;
+        let url = document.getElementById('document-image').innerText.trim();
+        let checkboxes = document.querySelectorAll('input[name="disease"]:checked');
+        let selectedLabel = [];
+        checkboxes.forEach((checkbox) => {
+            selectedLabel.push(checkbox.value);
+        });
         if (toolstateROI==null){
-            var labelDict = {label: selectedLabel};
+            var labelDict = {label: selectedLabel, imageurl: url};
         }
         else if (toolstateROI=='freehand'){
             var annotation = cornerstoneTools.getToolState(element, toolstateROI).data.pop();
             var selectedROI = {vertices: annotation.handles};
-            var labelDict = {label: selectedLabel, ROI: selectedROI};
+            var labelDict = {label: selectedLabel, imageurl: url, ROI: selectedROI};
         } else {
             var annotation = cornerstoneTools.getToolState(element, toolstateROI).data.pop();
             var selectedROI = {start: annotation.handles.start, end: annotation.handles.end, boundingBox: annotation.handles.textBox.boundingBox};
-            var labelDict = {label: selectedLabel, ROI: selectedROI};
+            var labelDict = {label: selectedLabel, imageurl: url, ROI: selectedROI};
         }
         document.getElementById('labels').value = JSON.stringify((labelDict));
     };
 </script>
+<style>
+/* The container for checkbox */
+.container {
+  display: block;
+  position: relative;
+  padding-left: 35px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  font-size: 22px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Hide the browser's default checkbox */
+.container input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+/* Create a custom checkbox */
+.checkmark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 25px;
+  width: 25px;
+  background-color: #eee;
+}
+
+/* On mouse-over, add a grey background color */
+.container:hover input ~ .checkmark {
+  background-color: #ccc;
+}
+
+/* When the checkbox is checked, add a blue background */
+.container input:checked ~ .checkmark {
+  background-color: #2196F3;
+}
+
+/* Create the checkmark/indicator (hidden when not checked) */
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+/* Show the checkmark when checked */
+.container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+/* Style the checkmark/indicator */
+.container .checkmark:after {
+  left: 9px;
+  top: 5px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  -webkit-transform: rotate(45deg);
+  -ms-transform: rotate(45deg);
+  transform: rotate(45deg);
+}
+</style>
 </html>

@@ -4,17 +4,9 @@
 
 ### Pre-requisite
 
-You will need two public subnets and two private subnets in a given Virtual Private Cloud (VPC). You can deploy the VPC network infrastructure using this [CloudFormation template](https://docs.aws.amazon.com/codebuild/latest/userguide/cloudformation-vpc-template.html) (Optional)
+You will need two public subnets and two private subnets in a given Virtual Private Cloud (VPC). You can either follow this [blog post](https://aws.amazon.com/blogs/database/deploy-an-amazon-aurora-postgresql-db-cluster-with-recommended-best-practices-using-aws-cloudformation/) to deploy the network infrastructure first, or deploy the VPC network infrastructure using this [CloudFormation template](https://docs.aws.amazon.com/codebuild/latest/userguide/cloudformation-vpc-template.html) (Optional)
 
 ### Deploy Orthanc DICOM Server on AWS ECS
-
-Here is the architecture diagraom of Orthanc on AWS ![diagram](Figures/orthanc-on-aws.jpg)  
-
-Go to nginx-orthanc-plugins-container folder. If you want to push the container image to [Amazon Elastic Container Registry](https://aws.amazon.com/ecr/), run the following script: `./build_and_push.sh`. 
-
-Alternatively, you can build docker container `docker build -t <tag> .` and push it to container repository manually. 
-
-After pushing the container image to ECR, copy the image URI (like <AWS Account ID>.dkr.ecr.<AWS Region>.amazonaws.com/nginx-orthanc-plugins]) that will be used in the following Cloudformation deployment.
 
 You can either deploy using AWS CLI:
 

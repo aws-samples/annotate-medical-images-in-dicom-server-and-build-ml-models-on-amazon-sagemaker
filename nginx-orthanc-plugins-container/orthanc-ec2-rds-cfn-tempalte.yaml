@@ -1,12 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Conditions:
-  CreateCluster: !Equals
-    - ''
-    - !Ref 'ParameterClusterName'
-  CreateLoadBalancer: !Equals
-    - ''
-    - !Ref 'ParameterLoadBalancerARN'
 Description: CloudFormation template to deploy Orthanc on AWS
+
 Parameters:
   ParameterClusterName:
     Description: Name of the ECS cluster to deploy to (optional)
@@ -46,15 +40,47 @@ Parameters:
       c3.2xlarge, c3.4xlarge, c3.8xlarge, r3.large, r3.xlarge, r3.2xlarge, r3.4xlarge,
       r3.8xlarge, i2.xlarge, i2.2xlarge, i2.4xlarge, i2.8xlarge]
     ConstraintDescription: Please choose a valid instance type.
+  NumberofEC2Instances:
+    Description: Number of EC2 instance to run container in ECS cluster
+    Type: Number
+    Default: 1
+  NumberofContainers:
+    Description: Number of docker containers to run tasks in ECS cluster
+    Type: Number
+    Default: 1
   RDSDBInstanceClass:
+    Default: db.t3.medium
+    Description: Database Instance Class. db.r5 instance classes are supported for Aurora PostgreSQL 10.6 or later. db.t3.medium instance class is supported for Aurora PostgreSQL 10.7 or later.
     Type: String
-    Default: "db.t3.medium"
+    AllowedValues:
+    - db.t3.medium
+    - db.r4.large
+    - db.r4.xlarge
+    - db.r4.2xlarge
+    - db.r4.4xlarge
+    - db.r4.8xlarge
+    - db.r4.16xlarge
+    - db.r5.large
+    - db.r5.xlarge
+    - db.r5.2xlarge
+    - db.r5.4xlarge
+    - db.r5.8xlarge
+    - db.r5.12xlarge
+    - db.r5.16xlarge
+    - db.r5.24xlarge
   RDSDBStorageType:
     Type: String
     Default: "gp2"
   RDSDBAllocatedStorage:
     Type: Number
     Default: 20
+  HasDBReplica:
+    Type: String
+    Description: Is replica instance needed for Aurora PostgreSQL DB cluster
+    AllowedValues:
+      - 'Yes Replica'
+      - 'No Replica'
+    Default: 'No Replica'
 
 Mappings:
   AWSRegionToAMI:
@@ -91,6 +117,17 @@ Mappings:
     sa-east-1:
       AMIID: ami-05313c3a9e9148109
 
+Conditions:
+  CreateCluster: !Equals
+    - ''
+    - !Ref 'ParameterClusterName'
+  CreateLoadBalancer: !Equals
+    - ''
+    - !Ref 'ParameterLoadBalancerARN'
+  IsReplica: !Equals 
+    - 'Yes Replica'
+    - !Ref HasDBReplica
+
 Resources:
   CloudMap:
     Type: AWS::ServiceDiscovery::PrivateDnsNamespace
@@ -104,7 +141,7 @@ Resources:
     Properties:
       ClusterName: orthanconaws
       Tags:
-        - Key: com.docker.compose.project
+        - Key: project
           Value: orthanconaws
   LogGroup:
     Properties:
@@ -114,7 +151,7 @@ Resources:
   DataBaseSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupDescription: DBSubnetGroup for RDS instances
+      DBSubnetGroupDescription: DBSubnetGroup for Aurora RDS instances
       SubnetIds:
         - !Ref PrivateSubnet1Id
         - !Ref PrivateSubnet2Id
@@ -130,34 +167,59 @@ Resources:
           IpProtocol: TCP
           ToPort: 5432
       Tags:
-        - Key: com.docker.compose.project
+        - Key: project
           Value: orthanconaws
         - Key: com.docker.compose.network
           Value: rds
       VpcId: !Ref 'ParameterVPCId'
-  PostgreSQLRDSInstance:
-    Type: AWS::RDS::DBInstance
+  AuroraDBCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
     Properties:
-      DBInstanceIdentifier: orthanc-instance
-      DBName: orthanc
-      DBInstanceClass: !Ref RDSDBInstanceClass
-      StorageType: !Ref RDSDBStorageType
-      AllocatedStorage: !Ref RDSDBAllocatedStorage
-      Engine: postgres
-      EngineVersion: 11
+      Engine: aurora-postgresql
+      EngineVersion: 11.6
+      DatabaseName: orthanc
+      Port: 5432
       MasterUsername: postgres
       MasterUserPassword: pgpassword
-      PubliclyAccessible: False
-      MultiAZ: True
-      StorageEncrypted: true
-      EnableIAMDatabaseAuthentication: true
-      EnableCloudwatchLogsExports: [postgresql]
-      Tags:
-        - Key: com.docker.compose.project
-          Value: "RDS PostgreSQL for Orthanc"
-      VPCSecurityGroups: 
-        - !Ref OrthancRDSNetwork
       DBSubnetGroupName: !Ref DataBaseSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref OrthancRDSNetwork
+      StorageEncrypted:  true
+      EnableIAMDatabaseAuthentication: true
+      Tags:
+        - Key: project
+          Value: "Aurora PostgreSQL cluster for Orthanc"
+  AuroraDBFirstInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      CopyTagsToSnapshot: true  
+      DBInstanceClass: !Ref RDSDBInstanceClass
+      DBClusterIdentifier: !Ref AuroraDBCluster  
+      Engine: aurora-postgresql
+      EngineVersion: 11.6
+      DBSubnetGroupName: !Ref DataBaseSubnetGroup
+      PubliclyAccessible: false
+      Tags:
+        - Key: project
+          Value: "Aurora PostgreSQL instance for Orthanc"
+  AuroraDBSecondInstance:
+    Condition: IsReplica
+    Type: AWS::RDS::DBInstance
+    DependsOn: 
+      - AuroraDBFirstInstance
+    Properties:
+      CopyTagsToSnapshot: true  
+      DBInstanceClass: !Ref RDSDBInstanceClass
+      DBClusterIdentifier: !Ref AuroraDBCluster  
+      Engine: aurora-postgresql
+      EngineVersion: 11.6
+      DBSubnetGroupName: !Ref DataBaseSubnetGroup
+      PubliclyAccessible: false
+      Tags:
+        - Key: project
+          Value: "Aurora PostgreSQL instance for Orthanc"
   OrthancServerNetwork:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -180,7 +242,7 @@ Resources:
           IpProtocol: TCP
           ToPort: 22
       Tags:
-        - Key: com.docker.compose.project
+        - Key: project
           Value: orthanconaws
         - Key: com.docker.compose.network
           Value: default
@@ -202,7 +264,7 @@ Resources:
         - !Ref 'PublicSubnet1Id'
         - !Ref 'PublicSubnet2Id'
       Tags:
-        - Key: com.docker.compose.project
+        - Key: project
           Value: orthanconaws
       Type: network
 
@@ -221,7 +283,7 @@ Resources:
         MinimumHealthyPercent: 100
       DeploymentController:
         Type: ECS
-      DesiredCount: 2
+      DesiredCount: !Ref NumberofContainers
       LaunchType: EC2
       LoadBalancers:
         - ContainerName: orthanc
@@ -243,7 +305,7 @@ Resources:
       ServiceRegistries:
         - RegistryArn: !GetAtt 'OrthancServiceDiscoveryEntry.Arn'
       Tags:
-        - Key: com.docker.compose.project
+        - Key: project
           Value: orthanconaws
         - Key: com.docker.compose.service
           Value: orthanc
@@ -281,7 +343,7 @@ Resources:
       Port: 4242
       Protocol: TCP
       Tags:
-        - Key: com.docker.compose.project
+        - Key: project
           Value: orthanconaws
       TargetType: ip
       VpcId: !Ref 'ParameterVPCId'
@@ -305,19 +367,21 @@ Resources:
       Port: 443
       Protocol: TCP
       Tags:
-        - Key: com.docker.compose.project
+        - Key: project
           Value: orthanconaws
       TargetType: ip
       VpcId: !Ref 'ParameterVPCId'
   OrthancTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     DependsOn:
-      - PostgreSQLRDSInstance
+      - AuroraDBCluster
     Properties:
       ContainerDefinitions:
         - Environment:
             - Name: ORTHANC__POSTGRESQL__HOST
-              Value: !GetAtt 'PostgreSQLRDSInstance.Endpoint.Address'
+              Value: !GetAtt 'AuroraDBCluster.Endpoint.Address'
+            - Name: ORTHANC__POSTGRESQL__PORT
+              Value: !GetAtt 'AuroraDBCluster.Endpoint.Port'
             - Name: LOCALDOMAIN
               Value: !Join
                 - ''
@@ -392,9 +456,9 @@ Resources:
         - !Ref 'PublicSubnet1Id'
         - !Ref 'PublicSubnet2Id'
       LaunchConfigurationName: !Ref 'ContainerInstances'
-      MinSize: '2'
-      MaxSize: '4'
-      DesiredCapacity: '2'
+      MinSize: '1'
+      MaxSize: '2'
+      DesiredCapacity: !Ref NumberofEC2Instances
     CreationPolicy:
       ResourceSignal:
         Timeout: PT15M

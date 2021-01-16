@@ -37,7 +37,7 @@ The manifest.json file will look at [this](https://github.com/aws-samples/annota
 ### Deploy the SageMaker Labeling and Notebook Resources
 
 click the button below to deploy both PreLabelTaskLambda and PostLabelTaskLambda functions:  
-[![launchstackbutton](Figures/launchstack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/template?stackName=SageMakerGroundTruthLambdaFunctions&templateURL=https://orthanc-on-aws.s3.amazonaws.com/orthanc-ec2-rds-cfn-tempalte.yaml)
+[![launchstackbutton](Figures/launchstack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/template?stackName=SageMakerLabelingResources&templateURL=https://orthanc-on-aws.s3.amazonaws.com/sagemaker_resources.yaml)
 
 Fill the parameter PreLabelLambdaSourceEndpointURL with the Orthanc endpoint URL from previous step.
 

@@ -1,7 +1,8 @@
 
 ## Orthanc on AWS 
 
-Here is the architecture diagram of Orthanc on AWS by default ![diagram](../Figures/orthanc-on-aws.jpg) 
+Here is the architecture diagram of default deployment of the Orthanc on AWS:  
+![diagram](../Figures/orthanc-on-aws.jpg) 
 
 The single container instance and single DB instance have been tested well with Amazon SageMaker GroundTruth labeling job. 
 
@@ -11,7 +12,8 @@ Alternatively, you can build docker container `docker build -t <tag> .` and push
 
 After pushing the container image to ECR, copy the image URI (like <AWS Account ID>.dkr.ecr.<AWS Region>.amazonaws.com/nginx-orthanc-plugins]) that will be used in the Cloudformation deployment.
 
-You can deploy the CloudFormation (CFN) stack on AWS console using `orthanc-ec2-rds-cfn-tempalte.yaml` template in this folder, by filling up the parameters like ![this](../Figures/CFNdeployment.png) 
+You can deploy the CloudFormation (CFN) stack on AWS console using `orthanc-ec2-rds-cfn-tempalte.yaml` template in this folder, by filling up the parameters like:   
+![this](../Figures/CFNdeployment.png) 
 
 Or you can deploy the CFN stack using AWS CLI:
 

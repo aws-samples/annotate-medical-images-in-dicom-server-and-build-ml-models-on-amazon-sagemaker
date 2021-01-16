@@ -1,11 +1,82 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: AWS CloudFormation to deploy Lambdas
+Description: AWS CloudFormation to deploy SageMaker annotations and modeling resources
 Parameters:
   PreLabelLambdaSourceEndpointURL:
     Type: String 
     Description: The Endpoint URL of PACS used by PreLabel Lambda function that will be used to construct the source of DICOM image
+  AnnotationS3BucketName:
+    Type: String
+    Default: sagemaker-groundtruth-label-dicom
+    Description: The name of S3 bucket hosting the SageMaker GroundTruth Labeling input and output files
+  NotebookInstanceName:
+    Type: String
+    Default: dicomannotationbookinstance
+  NotebookInstanceType:
+    Type: String
+    Default: ml.t3.medium
+    AllowedValues: 
+      - ml.c4.2xlarge
+      - ml.c4.4xlarge
+      - ml.c4.8xlarge
+      - ml.c4.xlarge
+      - ml.c5.18xlarge
+      - ml.c5.2xlarge
+      - ml.c5.4xlarge
+      - ml.c5.9xlarge
+      - ml.c5.xlarge
+      - ml.c5d.18xlarge
+      - ml.c5d.2xlarge
+      - ml.c5d.4xlarge
+      - ml.c5d.9xlarge
+      - ml.c5d.xlarge
+      - ml.m4.10xlarge
+      - ml.m4.16xlarge
+      - ml.m4.2xlarge
+      - ml.m4.4xlarge
+      - ml.m4.xlarge
+      - ml.m5.12xlarge
+      - ml.m5.24xlarge
+      - ml.m5.2xlarge
+      - ml.m5.4xlarge
+      - ml.m5.xlarge
+      - ml.p2.16xlarge
+      - ml.p2.8xlarge
+      - ml.p2.xlarge
+      - ml.p3.16xlarge
+      - ml.p3.2xlarge
+      - ml.p3.8xlarge
+      - ml.t2.2xlarge
+      - ml.t2.large
+      - ml.t2.medium
+      - ml.t2.xlarge
+      - ml.t3.2xlarge
+      - ml.t3.large
+      - ml.t3.medium
+      - ml.t3.xlarge
 
 Resources:
+  AnnotationS3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref AnnotationS3BucketName
+  SMGTLabelingExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub SMGTLabelingExecutionRole-${AWS::AccountId}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - sagemaker.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
+        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
+      Path: /
   ConsolidationLambdaSMGTExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -49,8 +120,11 @@ Resources:
             import base64
             from urllib.parse import urlparse
             import boto3
+            import logging
+            logger = logging.getLogger()
+            logger.setLevel(logging.INFO)
             def lambda_handler(event, context):
-                print(json.dumps(event, indent=2))
+                logger.debug(json.dumps(event, indent=2))
                 source = event['dataObject']['source'] if "source" in event['dataObject'] else None
                 source_ref = event['dataObject']['source-ref'] if "source-ref" in event['dataObject'] else None
                 labels = event['dataObject']['labels'] if "labels" in event['dataObject'] else None
@@ -66,12 +140,13 @@ Resources:
                 }
                 if labels is not None:
                     output['taskInput']['labels'] = labels
-                print(output)
+                logger.info(json.dumps(output, indent=2))
                 # If neither source nor source-ref specified, mark the annotation failed
                 if task_object is None:
                     print(" Failed to pre-process {} !".format(event["labelingJobArn"]))
                     output["isHumanAnnotationRequired"] = "false"
                 return output
+
       Role: !GetAtt 'PreLabelingLambdaSMGTExecutionRole.Arn'
       FunctionName: gt-prelabel-task-lambda
       Timeout: 60
@@ -164,7 +239,93 @@ Resources:
       Handler: index.lambda_handler
       Runtime: python3.6
       MemorySize: 128
+  SageMakerAPIExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub SageMakerAPIExecutionRoleName-${AWS::AccountId}
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: sts:AssumeRole    
+      Path: /
+      Policies:
+        - PolicyName: !Sub SageMakerAPIExecutionRolePolicyName-${AWS::AccountId}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - sagemaker:CreateModel
+                  - sagemaker:DeleteEndpointConfig
+                  - sagemaker:DeleteEndpoint
+                  - sagemaker:DeleteModel
+                  - sagemaker:CreateEndpoint
+                  - sagemaker:UpdateEndpoint
+                  - sagemaker:StopNotebookInstance
+                  - sagemaker:StartNotebookInstance
+                  - sagemaker:CreateHyperParameterTuningJob
+                  - sagemaker:DescribeHyperParameterTuningJob
+                  - s3:CreateBucket
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - sts:AssumeRole
+                  - iam:PassRole
+                  - iam:GetRole
+                  - sagemaker:DescribeEndpointConfig
+                  - sagemaker:CreateEndpointConfig
+                  - sageMaker:CreateEndpoint
+                  - sagemaker:DescribeEndpoint
+                  - sagemaker:InvokeEndpoint
+                  - sagemaker:CreateTrainingJob
+                  - sagemaker:DescribeTrainingJob
+                  - ecr:BatchGetImage
+                  - ecr:SetRepositoryPolicy
+                  - ecr:CompleteLayerUpload
+                  - ecr:BatchDeleteImage
+                  - ecr:UploadLayerPart
+                  - ecr:DeleteRepositoryPolicy
+                  - ecr:InitiateLayerUpload
+                  - ecr:DeleteRepository
+                  - ecr:PutImage
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CreateRepository
+                  - ecr:Describe*
+                  - ecr:GetAuthorizationToken
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:StartImageScan
+                  - logs:CreateLogDelivery
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:DeleteLogDelivery
+                  - logs:Describe*
+                  - logs:GetLogDelivery
+                  - logs:GetLogEvents
+                  - logs:ListLogDeliveries
+                  - logs:PutLogEvents
+                  - logs:PutResourcePolicy
+                  - logs:UpdateLogDelivery
+                Resource: "*"
+  SageMakerNotebookInstance:
+    Type: AWS::SageMaker::NotebookInstance
+    Properties:
+      NotebookInstanceName: !Ref NotebookInstanceName
+      InstanceType: !Ref NotebookInstanceType
+      RoleArn: !GetAtt SageMakerAPIExecutionRole.Arn
+      VolumeSizeInGB: 50
+      DefaultCodeRepository: https://github.com/aws-samples/applying-voice-classification-in-amazon-connect-contact-flow.git
+      AdditionalCodeRepositories:
+        - https://github.com/iiscleap/Coswara-Data.git
 Outputs:
-  PostLabelingLambdaIAMRole:
-    Description: Post Labeling Consolidation Lambda IAM Role
-    Value: !GetAtt 'ConsolidationLambdaSMGTExecutionRole.Arn'
+  SMGTLabelingExecutionRole:
+    Description: SageMaker GroundTruth Labeling IAM Role
+    Value: !GetAtt 'SMGTLabelingExecutionRole.Arn'
+  SageMakerNotebookInstance:
+    Value: !Ref SageMakerNotebookInstance
+  SageMakerAnnotationS3Bucket:
+    Value: !Ref AnnotationS3Bucket
+

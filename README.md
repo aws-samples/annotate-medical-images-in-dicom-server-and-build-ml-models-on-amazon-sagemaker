@@ -8,12 +8,13 @@ You will need two public subnets and two private subnets in a given Virtual Priv
 
 ### Deploy Orthanc DICOM Server on AWS ECS
 
-To deploy the CloudFormation (CFN) on AWS console, using 1-click deployment button:
+To deploy the CloudFormation (CFN) on AWS console, using 1-click deployment button:  
 [![launchstackbutton](Figures/launchstack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/template?stackName=OrthancOnAWSStack&templateURL=https://orthanc-on-aws.s3.amazonaws.com/orthanc-ec2-rds-cfn-tempalte.yaml)
 
 The required information will be EC2 Key pair and network infrastructure.
 
-After the CFN stack is successfully created, the Orthanc endpoint URL will be available in the Outputs tab like ![this](Figures/CFNoutputs.png)
+After the CFN stack is successfully created, the Orthanc endpoint URL will be available in the Outputs tab like:  
+![this](Figures/CFNoutputs.png)
 
 ### Upload DICOM images to Orthanc 
 
@@ -35,23 +36,37 @@ The manifest.json file will look at [this](https://github.com/aws-samples/annota
 
 ### Deploy the pre and post labeling Lambda functions
 
-click the button below to deploy both PreLabelTaskLambda and PostLabelTaskLambda functions
+click the button below to deploy both PreLabelTaskLambda and PostLabelTaskLambda functions:  
 [![launchstackbutton](Figures/launchstack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/template?stackName=SageMakerGroundTruthLambdaFunctions&templateURL=https://orthanc-on-aws.s3.amazonaws.com/orthanc-ec2-rds-cfn-tempalte.yaml)
 
 Fill the parameter PreLabelLambdaSourceEndpointURL with the Orthanc endpoint URL from previous step.
 
+Take a note of the outputs of CFN deployment, including SMGTLabelingExecutionRole and SageMakerAnnotationS3Bucket names:  
+![smcfnoutputs](Figures/SMCFNoutputs.png)
+
 ### Create Custom Label Job in SageMaker GroundTruth
 
-- Create a S3 bucket and upload the input manifest.json file generated earlier.    
-- Create a SageMaker GroundTruth Labeling Job, and specify the input and output data locations at Step 1 of job creation.  
+- Upload the input manifest.json file generated earlier to the SageMakerAnnotationS3Bucket 
+- Create a SageMaker GroundTruth Labeling Job: at step 1 specify the input and output data locations in SageMakerAnnotationS3Bucket plus the SMGTLabelingExecutionRole as IAM role for labeling job
 ![smgtjobstep1](Figures/sm-gt-job-details.png) 
-- Copy the [content in template.liquid.html](https://github.com/aws-samples/annotate-medical-images-in-dicom-server-and-build-ml-models-on-amazon-sagemaker/blob/main/sagemaker-groundtruth/template.liquid.html) to the Custom Template text field as well as configure the pre-labeling and post-labeling Lambda functions deployed earlier.
+- Copy the [content in template.liquid.html](https://github.com/aws-samples/annotate-medical-images-in-dicom-server-and-build-ml-models-on-amazon-sagemaker/blob/main/sagemaker-groundtruth/template.liquid.html) to the Custom Template text field as well as configure the gt-prelabel-task-lambda and gt-postlabel-task-lambda functions deployed earlier.
 ![smgtjobstep2](Figures/sm-gt-job-configure-custom-label.png)
 
 
 After configuring the custom labeling task, click on the Preview button, you will see the following preview
 ![smgtpreview](Figures/sm-gt-job-preview.png)
 
+
+If you created a private workforce, you can go to the Labeling Workforces tab and find the annotation console link:  
+![workforce](Figures/workforces.png)
+
+The annotator will be able to see the task created like:  
+![startworking](Figures/startworking.png)
+
+### Train and deploy model using SageMaker Notebook Instance
+
+The CFN deployment earlier also create a SageMaker notebook instance, open the Jupyter notebook to train and deploy machine learning models using the annotated datasets from SageMaker GroundTruth labeling job:  
+![smnotebook](Figures/SMnotebook.png)
 
 ## Security
 

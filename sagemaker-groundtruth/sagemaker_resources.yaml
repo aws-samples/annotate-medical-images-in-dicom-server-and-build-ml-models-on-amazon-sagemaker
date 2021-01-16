@@ -317,9 +317,7 @@ Resources:
       InstanceType: !Ref NotebookInstanceType
       RoleArn: !GetAtt SageMakerAPIExecutionRole.Arn
       VolumeSizeInGB: 50
-      DefaultCodeRepository: https://github.com/aws-samples/applying-voice-classification-in-amazon-connect-contact-flow.git
-      AdditionalCodeRepositories:
-        - https://github.com/iiscleap/Coswara-Data.git
+      DefaultCodeRepository: https://github.com/aws-samples/annotate-medical-images-in-dicom-server-and-build-ml-models-on-amazon-sagemaker.git
 Outputs:
   SMGTLabelingExecutionRole:
     Description: SageMaker GroundTruth Labeling IAM Role

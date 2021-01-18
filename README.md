@@ -1,5 +1,8 @@
 ## Annotate Medical Images in DICOM Server and Build ML models using Amazon SageMaker
 
+## Overview Architecture
+![Architecture](Figures/architecture.jpg)
+
 ## Deployment Steps
 
 ### Pre-requisite

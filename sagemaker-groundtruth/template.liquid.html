@@ -33,6 +33,17 @@ SPDX-License-Identifier: MIT-0 -->
             For instances, the normal chest X-ray depicts clear lungs without any areas of abnormal opacification in the image. Bacterial pneumonia typically exhibits a focal lobar consolidation, whereas viral pneumonia manifests with a more diffuse ‘‘interstitial’’ pattern in both lungs.
         </p>
     </div>
+    <div class="row btn-toolbar" style="padding-left:60px;padding-top:20px;padding-right:60px;">
+        <button type="button" class="btn btn-secondary mr-1" id="Pan">Pan</button>
+        <button type="button" class="btn btn-secondary mr-1" id="Zoom">Zoom</button>
+        <button type="button" class="btn btn-secondary mr-1" id="invert">Toggle Invert</button>
+        <button type="button" class="btn btn-secondary mr-1" id="hflip">Horizontal Flip</button>
+        <button type="button" class="btn btn-secondary mr-1" id="vflip">Vertical Flip</button>
+        <button type="button" class="btn btn-secondary mr-1" id="rotate">Rotate 90</button>
+        <button type="button" class="btn btn-secondary mr-1" id="Elliptical ROI">Elliptical ROI</button>
+        <button type="button" class="btn btn-secondary mr-1" id="Rectangle ROI">Rectangle ROI</button>
+        <button type="button" class="btn btn-secondary mr-1" id="Polygon ROI">Polygon ROI</button>
+    </div>
     <div class="row">
         <div class="col">
             <div style="width:666;height:666;position:relative;color: white;display:inline-block;"
@@ -44,15 +55,6 @@ SPDX-License-Identifier: MIT-0 -->
                 <div class="row" 
                      id="dicomImage"
                      style="width:666;height:666;top:60px;left:30px; position:absolute">
-                </div>
-                <div class="row btn-toolbar" 
-                     id="mousemode"
-                     style="top:10px;left:30px; position:absolute">
-                    <button type="button" class="btn btn-secondary mr-1" id="Pan">Pan</button>
-                    <button type="button" class="btn btn-secondary mr-1" id="Zoom">Zoom</button>
-                    <button type="button" class="btn btn-secondary mr-1" id="Elliptical ROI">Elliptical ROI</button>
-                    <button type="button" class="btn btn-secondary mr-1" id="Rectangle ROI">Rectangle ROI</button>
-                    <button type="button" class="btn btn-secondary mr-1" id="Polygon ROI">Polygon ROI</button>
                 </div>
             </div>
         </div>
@@ -149,6 +151,30 @@ SPDX-License-Identifier: MIT-0 -->
     document.getElementById("Zoom").onclick = function() {
         disableAllTools();
         cornerstoneTools.zoom.activate(element, 1); 
+    };
+    document.getElementById('invert').onclick = function() {
+        disableAllTools();
+        const viewport = cornerstone.getViewport(element);
+        viewport.invert = !viewport.invert;
+        cornerstone.setViewport(element, viewport);
+    };
+    document.getElementById('hflip').onclick = function() {
+        disableAllTools();
+        const viewport = cornerstone.getViewport(element);
+        viewport.hflip = !viewport.hflip;
+        cornerstone.setViewport(element, viewport);
+    };
+    document.getElementById('vflip').onclick = function() {
+        disableAllTools();
+        const viewport = cornerstone.getViewport(element);
+        viewport.vflip = !viewport.vflip;
+        cornerstone.setViewport(element, viewport);
+    };
+    document.getElementById('rotate').onclick = function() {
+        disableAllTools();
+        const viewport = cornerstone.getViewport(element);
+        viewport.rotation += 90;
+        cornerstone.setViewport(element, viewport);
     };
     document.getElementById("Elliptical ROI").onclick = function() {
         disableAllTools();

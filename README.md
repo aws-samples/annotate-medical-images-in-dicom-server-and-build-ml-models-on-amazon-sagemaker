@@ -47,6 +47,8 @@ Fill the parameter PreLabelLambdaSourceEndpointURL with the Orthanc endpoint URL
 Take a note of the outputs of CFN deployment, including SMGTLabelingExecutionRole and SageMakerAnnotationS3Bucket names:  
 ![smcfnoutputs](Figures/SMCFNoutputs.png)
 
+The manifest.json file generated earlier will be uploaded the the SageMakerAnnotationS3Bucket.
+
 ### Create Custom Label Job in SageMaker GroundTruth
 
 - Upload the input manifest.json file generated earlier to the SageMakerAnnotationS3Bucket 

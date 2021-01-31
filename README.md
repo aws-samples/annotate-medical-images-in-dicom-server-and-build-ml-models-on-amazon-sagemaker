@@ -52,20 +52,17 @@ The manifest.json file generated earlier will be uploaded the the SageMakerAnnot
 ### Create Custom Label Job in SageMaker GroundTruth
 
 - Upload the input manifest.json file generated earlier to the SageMakerAnnotationS3Bucket 
+- Create workforce and add team member
+![smgtworkforce](Figures/smgtworkforce.png)
 - Create a SageMaker GroundTruth Labeling Job: at step 1 specify the input and output data locations in SageMakerAnnotationS3Bucket plus the SMGTLabelingExecutionRole as IAM role for labeling job
 ![smgtjobstep1](Figures/sm-gt-job-details.png) 
 - Copy the [content in template.liquid.html](https://github.com/aws-samples/annotate-medical-images-in-dicom-server-and-build-ml-models-on-amazon-sagemaker/blob/main/sagemaker-groundtruth/template.liquid.html) to the Custom Template text field as well as configure the gt-prelabel-task-lambda and gt-postlabel-task-lambda functions deployed earlier.
 ![smgtjobstep2](Figures/sm-gt-job-configure-custom-label.png)
 
-
 After configuring the custom labeling task, click on the Preview button, you will see the following preview
 ![smgtpreview](Figures/sm-gt-job-preview.png)
 
-
-If you created a private workforce, you can go to the Labeling Workforces tab and find the annotation console link:  
-![workforce](Figures/workforces.png)
-
-The annotator will be able to see the task created like:  
+If you created a private workforce, you can go to the Labeling Workforces tab and find the annotation console link there as shown earlier. The annotator will be able to see the task created like:  
 ![startworking](Figures/startworking.png)
 
 ### Train and deploy model using SageMaker Notebook Instance

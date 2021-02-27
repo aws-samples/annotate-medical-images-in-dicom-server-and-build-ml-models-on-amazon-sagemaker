@@ -30,7 +30,7 @@ To run the DICOM training using MONAI follow the steps below:
 <li>The Notebook will need permissions to call other services including SageMaker and S3.  Choose an existing role or create a role with the AmazonSageMakerFull Access IAM role.  
 <li>Create Notebook instance and once In Service, then Open Jupyter Lab.
 <li>In the Jupyter Notebook, select File > New > Terminal, cd SageMaker and execute
-    <br/><code>git clone TBD</code>
+    <br/><code>git clone git@github.com:aws-samples/annotate-medical-images-in-dicom-server-and-build-ml-models-on-amazon-sagemaker.git</code>
 <li>Update the set.env file within Jupyter Notebook with the S3 location (BUCKET) and prefix/path (BUCKET_PATH).
 <li>Open the Jupyter Notebook dicom_training.ipynb and Run > Run all cells to observe the DICOM training example using MONAI.
 </ol>

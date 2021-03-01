@@ -4,16 +4,12 @@ Parameters:
   PreLabelLambdaSourceEndpointURL:
     Type: String 
     Description: The Endpoint URL of PACS used by PreLabel Lambda function that will be used to construct the source of DICOM image
-  AnnotationS3BucketName:
-    Type: String
-    Default: sagemaker-groundtruth-label-dicom
-    Description: The name of S3 bucket hosting the SageMaker GroundTruth Labeling input and output files
   NotebookInstanceName:
     Type: String
     Default: dicomannotationbookinstance
   NotebookInstanceType:
     Type: String
-    Default: ml.t3.medium
+    Default: ml.m5.xlarge
     AllowedValues: 
       - ml.c4.2xlarge
       - ml.c4.4xlarge
@@ -58,7 +54,7 @@ Resources:
   AnnotationS3Bucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Ref AnnotationS3BucketName
+      BucketName: !Sub sagemaker-groundtruth-label-dicom-${AWS::AccountId}
   SMGTLabelingExecutionRole:
     Type: AWS::IAM::Role
     Properties:

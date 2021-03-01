@@ -60,7 +60,7 @@ The manifest.json file generated earlier will be uploaded the the SageMakerAnnot
 ![smgtjobstep2](Figures/sm-gt-job-configure-custom-label.png)
 
 After configuring the custom labeling task, click on the Preview button, you will see the following preview
-![smgtpreview](Figures/sm-gt-job-preview.png)
+![smgtpreview](Figures/sm-gt-dicom-demo-page.gif)
 
 If you created a private workforce, you can go to the Labeling Workforces tab and find the annotation console link there as shown earlier. The annotator will be able to see the task created like:  
 ![startworking](Figures/startworking.png)

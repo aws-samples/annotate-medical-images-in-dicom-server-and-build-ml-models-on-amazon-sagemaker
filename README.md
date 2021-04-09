@@ -12,7 +12,7 @@ You will need two public subnets and two private subnets in a given Virtual Priv
 ### Deploy Orthanc DICOM Server on AWS ECS
 
 To deploy the CloudFormation (CFN) on AWS console, using 1-click deployment button:  
-[![launchstackbutton](Figures/launchstack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/template?stackName=OrthancOnAWSStack&templateURL=https://orthanc-on-aws.s3.amazonaws.com/orthanc-ec2-rds-cfn-tempalte.yaml)
+[![launchstackbutton](Figures/launchstack.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/create/template?stackName=OrthancOnAWSStack&templateURL=https://orthanc-on-aws.s3.amazonaws.com/orthanc-ec2-cfn-tempalte.yaml)
 
 The required information will be EC2 Key pair and network infrastructure.
 

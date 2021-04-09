@@ -1,10 +1,6 @@
 
 ## Orthanc on AWS 
 
-### Disclaimer
-
-Orthanc is licensed GPL/AGPLv3. This container was built from the [open source version of Orthanc](https://github.com/jodogne/OrthancDocker). This deployment is only for Amazon SageMaker GroundTruth labeling demo and only port 443 for HTTPS is open for the Orthanc container. 
-
 If you want to build your own container image and push the container image to [Amazon Elastic Container Registry](https://aws.amazon.com/ecr/), run the following script: `./build_and_push.sh`. 
 
 Alternatively, you can build docker container `docker build -t <tag> .` and push it to container repository manually. The Orthanc docker image was derived from [this document](https://book.orthanc-server.com/users/docker.html). The CORS headers were injected in Nginx reverse proxy on top of it.
@@ -20,3 +16,7 @@ Or you can deploy the CFN stack using AWS CLI:
 
 Here is the architecture diagram of HA deployment of the Orthanc on AWS:  
 ![diagram](../Figures/orthanc-on-aws.jpg) 
+
+### Disclaimer
+
+Orthanc is licensed GPL/AGPLv3. This container was built from the [open source version of Orthanc](https://github.com/jodogne/OrthancDocker). This deployment is only for Amazon SageMaker GroundTruth labeling demo and only port 443 for HTTPS is open for the Orthanc container. 

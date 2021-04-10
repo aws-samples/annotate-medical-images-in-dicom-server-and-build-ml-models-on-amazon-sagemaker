@@ -12,21 +12,15 @@ Parameters:
     Description: The url of a docker image that contains the application process that will handle the traffic for this service
     Default: flamingofugang/nginx-orthanc-plugins:latest
     Type: String
+  ParameterVPCId:
+    Description: ID of the VPC
+    Type: AWS::EC2::VPC::Id
   PublicSubnet1Id:
     Description: PublicSubnetId, for Availability Zone 1 in the region in your VPC
     Type: AWS::EC2::Subnet::Id
   PublicSubnet2Id:
     Description: PublicSubnetId, for Availability Zone 2 in the region in your VPC
     Type: AWS::EC2::Subnet::Id
-  PrivateSubnet1Id:
-    Description: PrivateSubnetId, for Availability Zone 1 in the region in your VPC
-    Type: AWS::EC2::Subnet::Id
-  PrivateSubnet2Id:
-    Description: PrivateSubnetId, for Availability Zone 2 in the region in your VPC
-    Type: AWS::EC2::Subnet::Id
-  ParameterVPCId:
-    Description: ID of the VPC
-    Type: AWS::EC2::VPC::Id
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
     Description: Name of an existing EC2 KeyPair to enable SSH access to the ECS instances.
@@ -48,39 +42,32 @@ Parameters:
     Description: Number of docker containers to run tasks in ECS cluster
     Type: Number
     Default: 1
-  RDSDBInstanceClass:
-    Default: db.t3.medium
-    Description: Database Instance Class. db.r5 instance classes are supported for Aurora PostgreSQL 10.6 or later. db.t3.medium instance class is supported for Aurora PostgreSQL 10.7 or later.
-    Type: String
-    AllowedValues:
-    - db.t3.medium
-    - db.r4.large
-    - db.r4.xlarge
-    - db.r4.2xlarge
-    - db.r4.4xlarge
-    - db.r4.8xlarge
-    - db.r4.16xlarge
-    - db.r5.large
-    - db.r5.xlarge
-    - db.r5.2xlarge
-    - db.r5.4xlarge
-    - db.r5.8xlarge
-    - db.r5.12xlarge
-    - db.r5.16xlarge
-    - db.r5.24xlarge
-  RDSDBStorageType:
-    Type: String
-    Default: "gp2"
-  RDSDBAllocatedStorage:
+  OrthancContainerCPU:
+    Description: The number of cpu units the Amazon ECS container agent will reserve for the container.
     Type: Number
-    Default: 20
-  HasDBReplica:
+    Default: 2048
+    AllowedValues: [256, 512, 1024, 2048, 4096]
+  OrthancContainerMemory:
+    Description: The amount (in MiB) of memory to present to the container. . Memory should be at least two times of vCPU unit according to documentation.
+    Type: Number
+    Default: 4096
+    AllowedValues: [512, 1024, 2048, 3072, 4096, 5120, 6144, 7168, 8192, 9216, 10240, 11264, 12288, 13312, 14336, 15360, 16384, 30720]
+  EFSNameTag:
+    Description: The name of the EFS volume
     Type: String
-    Description: Is replica instance needed for Aurora PostgreSQL DB cluster
-    AllowedValues:
-      - 'Yes Replica'
-      - 'No Replica'
-    Default: 'No Replica'
+    MinLength: '1'
+    Default: myEFSvolume
+  EnableEFSBackup:
+    Type: String
+    Description: whether enable EFS backup or not. EFS backup has extra associated cost.
+    Default: ENABLED
+    AllowedValues: [ENABLED, DISABLED]
+  EFSStorageInfrequentAcessAfter:
+    Type: String
+    Description: A value that describes the period of time that a file is not accessed, after which it transitions to the IA storage class.
+    Default: AFTER_90_DAYS
+    AllowedValues: [AFTER_14_DAYS, AFTER_30_DAYS, AFTER_60_DAYS, AFTER_7_DAYS, AFTER_90_DAYS]
+   
 
 Mappings:
   AWSRegionToAMI:
@@ -124,9 +111,6 @@ Conditions:
   CreateLoadBalancer: !Equals
     - ''
     - !Ref 'ParameterLoadBalancerARN'
-  IsReplica: !Equals 
-    - 'Yes Replica'
-    - !Ref HasDBReplica
 
 Resources:
   CloudMap:
@@ -135,6 +119,20 @@ Resources:
       Description: Service Map for Docker Compose project orthanconaws
       Name: orthanconaws.local
       Vpc: !Ref 'ParameterVPCId'
+  OrthancServiceDiscoveryEntry:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Description: '"orthanc" service discovery entry in Cloud Map'
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        RoutingPolicy: MULTIVALUE
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+      Name: orthanc
+      NamespaceId: !Ref 'CloudMap'
+
   Cluster:
     Type: AWS::ECS::Cluster
     Condition: CreateCluster
@@ -148,89 +146,47 @@ Resources:
       LogGroupName: /docker-compose/orthanconaws
     Type: AWS::Logs::LogGroup
 
-  DataBaseSubnetGroup:
-    Type: AWS::RDS::DBSubnetGroup
+  FileSystem:
+    Type: AWS::EFS::FileSystem
     Properties:
-      DBSubnetGroupDescription: DBSubnetGroup for Aurora RDS instances
-      SubnetIds:
-        - !Ref PrivateSubnet1Id
-        - !Ref PrivateSubnet2Id
-  OrthancRDSNetwork:
-    Type: AWS::EC2::SecurityGroup
+      Encrypted: True
+      BackupPolicy: 
+        Status: !Ref EnableEFSBackup
+      LifecyclePolicies:
+        - TransitionToIA: !Ref EFSStorageInfrequentAcessAfter
+      FileSystemTags:
+        - Key: Name
+          Value: !Ref 'EFSNameTag'
+  MountTarget1:
+    Type: AWS::EFS::MountTarget
     Properties:
-      GroupDescription: OrthancOnAWS RDS Security Group
-      GroupName: OrthancRDSNetwork
-      SecurityGroupIngress:
-        - SourceSecurityGroupId: !Ref 'OrthancServerNetwork'
-          Description: postgres:5432/tcp
-          FromPort: 5432
-          IpProtocol: TCP
-          ToPort: 5432
-      Tags:
-        - Key: project
-          Value: orthanconaws
-        - Key: com.docker.compose.network
-          Value: rds
-      VpcId: !Ref 'ParameterVPCId'
-  AuroraDBCluster:
-    Type: AWS::RDS::DBCluster
-    DeletionPolicy: Snapshot
-    UpdateReplacePolicy: Snapshot
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Ref 'PublicSubnet1Id'
+      SecurityGroups:
+        - !Ref 'OrthancEFSNetwork'
+  MountTarget2:
+    Type: AWS::EFS::MountTarget
     Properties:
-      Engine: aurora-postgresql
-      EngineVersion: 11.6
-      DatabaseName: orthanc
-      Port: 5432
-      MasterUsername: postgres
-      MasterUserPassword: pgpassword
-      DBSubnetGroupName: !Ref DataBaseSubnetGroup
-      VpcSecurityGroupIds:
-        - !Ref OrthancRDSNetwork
-      StorageEncrypted:  true
-      EnableIAMDatabaseAuthentication: true
-      Tags:
-        - Key: project
-          Value: "Aurora PostgreSQL cluster for Orthanc"
-  AuroraDBFirstInstance:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      CopyTagsToSnapshot: true  
-      DBInstanceClass: !Ref RDSDBInstanceClass
-      DBClusterIdentifier: !Ref AuroraDBCluster  
-      Engine: aurora-postgresql
-      EngineVersion: 11.6
-      DBSubnetGroupName: !Ref DataBaseSubnetGroup
-      PubliclyAccessible: false
-      Tags:
-        - Key: project
-          Value: "Aurora PostgreSQL instance for Orthanc"
-  AuroraDBSecondInstance:
-    Condition: IsReplica
-    Type: AWS::RDS::DBInstance
-    DependsOn: 
-      - AuroraDBFirstInstance
-    Properties:
-      CopyTagsToSnapshot: true  
-      DBInstanceClass: !Ref RDSDBInstanceClass
-      DBClusterIdentifier: !Ref AuroraDBCluster  
-      Engine: aurora-postgresql
-      EngineVersion: 11.6
-      DBSubnetGroupName: !Ref DataBaseSubnetGroup
-      PubliclyAccessible: false
-      Tags:
-        - Key: project
-          Value: "Aurora PostgreSQL instance for Orthanc"
+      FileSystemId: !Ref FileSystem
+      SubnetId: !Ref 'PublicSubnet2Id'
+      SecurityGroups:
+        - !Ref 'OrthancEFSNetwork'
+  NFSAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties: 
+      FileSystemId: !Ref FileSystem
+      PosixUser:
+        Gid: "0"
+        Uid: "0"
+      RootDirectory:
+        Path: "/"
+
   OrthancServerNetwork:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: OrthancOnAWS default Security Group
       GroupName: OrthancServerNetwork
       SecurityGroupIngress:
-        - CidrIp: '0.0.0.0/0'
-          Description: orthanc:4242/tcp
-          FromPort: 4242
-          IpProtocol: TCP
-          ToPort: 4242
         - CidrIp: '0.0.0.0/0'
           Description: nginx:443/tcp
           FromPort: 443
@@ -244,8 +200,6 @@ Resources:
       Tags:
         - Key: project
           Value: orthanconaws
-        - Key: com.docker.compose.network
-          Value: default
       VpcId: !Ref 'ParameterVPCId'
   OrthancServerNetworkIngress:
     Type: AWS::EC2::SecurityGroupIngress
@@ -254,6 +208,22 @@ Resources:
       GroupId: !Ref 'OrthancServerNetwork'
       IpProtocol: '-1'
       SourceSecurityGroupId: !Ref 'OrthancServerNetwork'
+  OrthancEFSNetwork:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Orthanc EFS Security Group
+      GroupName: OrthancEFSNetwork
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref 'OrthancServerNetwork'
+          Description: efs:2049/tcp
+          FromPort: 2049
+          IpProtocol: TCP
+          ToPort: 2049
+      Tags:
+        - Key: project
+          Value: orthanc-on-aws
+      VpcId: !Ref 'ParameterVPCId'
+
   orthanconawsLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Condition: CreateLoadBalancer
@@ -271,7 +241,6 @@ Resources:
   OrthancService:
     Type: AWS::ECS::Service
     DependsOn:
-      - OrthancTCP4242Listener
       - OrthancTCP443Listener
     Properties:
       Cluster: !If
@@ -286,9 +255,6 @@ Resources:
       DesiredCount: !Ref NumberofContainers
       LaunchType: EC2
       LoadBalancers:
-        - ContainerName: orthanc
-          ContainerPort: 4242
-          TargetGroupArn: !Ref 'OrthancTCP4242TargetGroup'
         - ContainerName: orthanc
           ContainerPort: 443
           TargetGroupArn: !Ref 'OrthancTCP443TargetGroup'
@@ -307,46 +273,7 @@ Resources:
       Tags:
         - Key: project
           Value: orthanconaws
-        - Key: com.docker.compose.service
-          Value: orthanc
       TaskDefinition: !Ref 'OrthancTaskDefinition'
-  OrthancServiceDiscoveryEntry:
-    Type: AWS::ServiceDiscovery::Service
-    Properties:
-      Description: '"orthanc" service discovery entry in Cloud Map'
-      DnsConfig:
-        DnsRecords:
-          - TTL: 60
-            Type: A
-        RoutingPolicy: MULTIVALUE
-      HealthCheckCustomConfig:
-        FailureThreshold: 1
-      Name: orthanc
-      NamespaceId: !Ref 'CloudMap'
-  OrthancTCP4242Listener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - ForwardConfig:
-            TargetGroups:
-              - TargetGroupArn: !Ref 'OrthancTCP4242TargetGroup'
-          Type: forward
-      LoadBalancerArn: !If
-        - CreateLoadBalancer
-        - !Ref 'orthanconawsLoadBalancer'
-        - !Ref 'ParameterLoadBalancerARN'
-      Port: 4242
-      Protocol: TCP
-  OrthancTCP4242TargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Port: 4242
-      Protocol: TCP
-      Tags:
-        - Key: project
-          Value: orthanconaws
-      TargetType: ip
-      VpcId: !Ref 'ParameterVPCId'
   OrthancTCP443Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -373,41 +300,15 @@ Resources:
       VpcId: !Ref 'ParameterVPCId'
   OrthancTaskDefinition:
     Type: AWS::ECS::TaskDefinition
-    DependsOn:
-      - AuroraDBCluster
     Properties:
       ContainerDefinitions:
         - Environment:
-            - Name: ORTHANC__POSTGRESQL__HOST
-              Value: !GetAtt 'AuroraDBCluster.Endpoint.Address'
-            - Name: ORTHANC__POSTGRESQL__PORT
-              Value: !GetAtt 'AuroraDBCluster.Endpoint.Port'
             - Name: LOCALDOMAIN
               Value: !Join
                 - ''
                 - - !Ref 'AWS::Region'
                   - .compute.internal
                   - ' orthanconaws.local'
-            - Name: ORTHANC__REGISTERED_USERS
-              Value: "{\"demo\": \"demo\"}\n"
-            - Name: ORTHANC_JSON
-              Value: |
-                {
-                  "Name" : "Orthanc in Docker",
-                  "RemoteAccessAllowed" : true,
-                  "PostgreSQL" : {
-                    "EnableIndex" : true,
-                    "EnableStorage" : true,
-                    "Host" : "172.17.0.38",
-                    "Port" : 5432,
-                    "Database" : "orthanc",
-                    "Username" : "postgres",
-                    "Password" : "pgpassword"
-                  },
-                  "DicomWeb": {
-                    "Enable": true
-                  }
-                }
           Essential: true
           Image: !Ref 'ConainerImageUrl'
           LinuxParameters: {}
@@ -418,20 +319,29 @@ Resources:
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: orthanconaws
           Name: orthanc
+          MountPoints:
+            - ContainerPath: /var/lib/orthanc/db
+              SourceVolume: my-efs
           PortMappings:
-            - ContainerPort: 4242
-              HostPort: 4242
-              Protocol: tcp
             - ContainerPort: 8042
               HostPort: 8042
               Protocol: tcp
             - ContainerPort: 443
               HostPort: 443
               Protocol: tcp
-      Cpu: '2048'
+      Volumes:
+        - name: my-efs
+          EFSVolumeConfiguration: 
+            FilesystemId: !GetAtt 'FileSystem.FileSystemId'
+            TransitEncryption: ENABLED
+            AuthorizationConfig: 
+              AccessPointId: !Ref NFSAccessPoint
+              IAM: ENABLED
+      Cpu: !Ref OrthancContainerCPU
+      Memory: !Ref OrthancContainerMemory
       ExecutionRoleArn: !Ref 'OrthancTaskExecutionRole'
+      TaskRoleArn: !Ref 'OrthancTaskRole'
       Family: orthanconaws-orthanc
-      Memory: '4096'
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - EC2
@@ -449,6 +359,19 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+  OrthancTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+        Version: '2012-10-17'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonElasticFileSystemFullAccess
   ECSAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:

@@ -19,4 +19,4 @@ Here is the architecture diagram of HA deployment of the Orthanc on AWS:
 
 ### Disclaimer
 
-Orthanc is licensed GPL/AGPLv3. This container was built from the [open source version of Orthanc](https://github.com/jodogne/OrthancDocker). This deployment is only for Amazon SageMaker GroundTruth labeling demo and only port 443 for HTTPS is open for the Orthanc container. 
+This container was built from the [open source version of Orthanc](https://github.com/jodogne/OrthancDocker). This deployment is only for Amazon SageMaker GroundTruth labeling demo and only port 443 for HTTPS is open for the Orthanc container. Orthanc is licensed GPL/AGPLv3. Please note that by running Orthanc under AGPLv3, you consent to complying with any and all requirements imposed by AGPLv3 in full, including but not limited to attribution requirements. You can see a full list of requirements under [AGPLv3](https://opensource.org/licenses/AGPL-3.0).

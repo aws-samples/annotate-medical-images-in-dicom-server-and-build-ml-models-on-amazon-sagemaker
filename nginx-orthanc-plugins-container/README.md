@@ -1,7 +1,13 @@
 
 ## Orthanc on AWS 
 
-If you want to build your own container image and push the container image to [Amazon Elastic Container Registry](https://aws.amazon.com/ecr/), run the following script: `./build_and_push.sh`. 
+You can build a customized docker container with Nginx and Orthanc. Nginx is a reverse proxy to support HTTPS and to add CORS headers. To build the container image, you will need SSL certificate. You can generate a self signed certificate for testing purpose:
+
+```
+openssl req -x509 -newkey rsa:4096 -keyout nginx/server.key -out nginx/server.crt -days 365
+```
+
+You can build your own container image and push the container image to [Amazon Elastic Container Registry](https://aws.amazon.com/ecr/) by running the script: `./build_and_push.sh`. 
 
 Alternatively, you can build docker container `docker build -t <tag> .` and push it to container repository manually. The Orthanc docker image was derived from [this document](https://book.orthanc-server.com/users/docker.html). The CORS headers were injected in Nginx reverse proxy on top of it.
 

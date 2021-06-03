@@ -55,6 +55,10 @@ Resources:
     Type: 'AWS::S3::Bucket'
     Properties:
       BucketName: !Sub sagemaker-groundtruth-label-dicom-${AWS::AccountId}
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration: 
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
   SMGTLabelingExecutionRole:
     Type: AWS::IAM::Role
     Properties:

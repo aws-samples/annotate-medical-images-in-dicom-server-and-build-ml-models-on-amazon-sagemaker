@@ -89,6 +89,37 @@ Execution role : **Create a new role with basic Lambda permissions**
 
 5. Upload the [gt-postlabel-task-lambda.zip](src/lambda/gt-postlabel-task-lambda.zip)
 
+
+6. Go to Configuration tab and click on the role to launch IAM console and copy the IAM role ARN.
+![](src/images/sm-gt-postlabellambdaexecutionrole.png)
+
+7. IN IAM console trace the SMGTLabelingExecutionRole created in step 2 (Set up Bucket and Execution role for Labeling Job)  and edit the trust policy to add the lambda role execution ARN identified in step 6 above 
+
+![IAM Policy](src/images/sm-gt-sagemakerexecutionroletrustpolicy.png)
+
+The trust policy should look like this
+```
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "sagemaker.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "lambda.amazonaws.com",
+        "AWS": "arn:aws:iam::ACCOUNT_ID:role/service-role/LAMBDA_ROLE_ARN"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
 ## Step 4: Create Custom Label Job in SageMaker GroundTruth
 1. Create workforce of private workers and add to a team. 
 ![Create Private Team](src/images/sm-gt-createprivateteam.png)

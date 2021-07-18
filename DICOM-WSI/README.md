@@ -7,10 +7,10 @@ This project will help you integrate a web based app using DICOM Microscopic vie
 
 1. Clone GitHub repo 
 ```
-git clone https://github.com/rahulbaisla/annotate-medical-images-in-sagemaker-groundtruth-using-dicom-microscopic-viewer.git
+git clone https://github.com/aws-samples/annotate-medical-images-in-dicom-server-and-build-ml-models-on-amazon-sagemaker.git
 ```
 
-2. cd annotate-medical-images-in-sagemaker-groundtruth-using-dicom-microscopic-viewer
+2. cd annotate-medical-images-in-sagemaker-groundtruth-using-dicom-microscopic-viewer/DICOM-WSI 
 
 3. npm install
 
@@ -159,4 +159,9 @@ Replace the highlighted path with the path where you uploaded the static js/css 
 1. Navigate to Labeling Workforces from AWS Console and copy the labeling portal URL
 ![Labeling portal URL](src/images/sm-gt-labelingportalurl.png)
 
+
+
+
 2. Launch the URL and start working on the labeling job.
+
+**Watch** [Demo Video](src/images/Demo.mp4)

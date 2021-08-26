@@ -5,7 +5,6 @@ import argparse
 import json
 import logging
 import os
-import sagemaker_containers
 import sys
 import torch
 import torch.distributed as dist
@@ -143,7 +142,15 @@ def train(args):
         epoch_loss /= step
         epoch_loss_values.append(epoch_loss)
         logger.info(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")
-        
+    save_model(model, args.model_dir)
+
+
+def save_model(model, model_dir):
+    logger.info("Saving the model.")
+    path = os.path.join(model_dir, 'model.pth')
+    # recommended way from http://pytorch.org/docs/master/notes/serialization.html
+    torch.save(model.cpu().state_dict(), path)
+
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

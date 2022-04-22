@@ -1,0 +1,9 @@
+# Python and Jupyter:
+__pycache__/
+.ipynb_checkpoints
+
+# NodeJS
+**/node_modules/**
+
+# Operating Systems:
+.DS_Store

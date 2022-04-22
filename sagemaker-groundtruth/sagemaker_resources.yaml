@@ -150,6 +150,17 @@ Resources:
                 }
                 if labels is not None:
                     output['taskInput']['labels'] = labels
+                prev_annotation = event['dataObject'].get('prevAnnotation')
+                if prev_annotation is not None:
+                    try:
+                        output['taskInput']['prevAnnotation'] = (
+                            prev_annotation['annotationsFromAllWorkers'][0]['annotationData']['content']
+                        )
+                    except Exception as e:
+                        logger.exception(
+                            'Failed to include previous annotation in task object - check previous job output '
+                            'structure is as expected'
+                        )
                 logger.info(json.dumps(output, indent=2))
                 # If neither source nor source-ref specified, mark the annotation failed
                 if task_object is None:

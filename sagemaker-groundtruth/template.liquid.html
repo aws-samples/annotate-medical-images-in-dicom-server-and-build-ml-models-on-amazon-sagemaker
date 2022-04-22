@@ -21,7 +21,7 @@ SPDX-License-Identifier: MIT-0 -->
 </div>
 
 <crowd-form>
-    <input name="labels" id="labels" type="hidden">
+    <input name="labels" id="labels" type="hidden" value="{{ task.input.prevAnnotation }}" />
 
     <!-- Prevent crowd-form from creating its own button -->
     <crowd-button id="submit" form-action="submit" style="display: none;"></crowd-button>
@@ -82,9 +82,18 @@ SPDX-License-Identifier: MIT-0 -->
         }
     });
 
+    function getLabelClasses() {
+        const rawLabels = document.getElementById('document-labels').innerText.trim();
+        try {
+            return JSON.parse(rawLabels);
+        } catch (err) {
+            console.log("Couldn't parse raw labels as JSON - interpreting as comma-separated string");
+            return rawLabels.split(',');
+        }
+    }
+
     function createLabelButtons() {
-        var str = document.getElementById('document-labels').innerText.trim();
-        var labels = str.split(",")
+        const labels = getLabelClasses();
 
         for (i = 0; i < labels.length; i++) {
             document.getElementById('labelsSelection').innerHTML += '<label class="container">'+labels[i]+'<input type="checkbox" name="disease" value="'+labels[i]+'"><span class="checkmark"></span></label>'
@@ -93,13 +102,48 @@ SPDX-License-Identifier: MIT-0 -->
     }
 
     var loaded = false;
+    var element = document.getElementById('dicomImage');
+
+    function loadPrevAnnotations() {
+        const prevAnnRaw = document.getElementById('labels').value;
+        if (!prevAnnRaw) return;
+        console.log('Previous Annotations:', prevAnnRaw);
+        const prevAnnotations = JSON.parse(prevAnnRaw);
+        const prevToolData = JSON.parse(prevAnnotations.labels);
+        const roi = prevToolData.ROI;
+
+        // Need to translate back from saved SMGT annotations to cornerstone tool state:
+        let roiToolType;
+        let roiData;
+        if ('vertices' in roi) {
+            roiToolType = 'freehand';
+            roiData = {
+                handles: roi.vertices,
+            };
+        } else {
+            // TODO: Detect ellipses properly
+            // This is hacky because we don't currently save enough in the SMGT result (below) to
+            // actually know whether the rectangle or ellipse ROI tool was used. Would be better to
+            // save a bit more information in the SMGT result - which would enable us to properly
+            // reconstruct here.
+            roiToolType = 'rectangleRoi';
+            roiData = {
+                handles: {
+                    start: roi.start,
+                    end: roi.end,
+                    textBox: { boundingBox: roi.boundingBox },
+                },
+            };
+        }
+        
+        cornerstoneTools.addToolState(element, roiToolType, roiData);
+    }
+
     function downloadAndView() {
         let url = document.getElementById('document-image').innerText.trim();
 
         // prefix the url with wadouri: so cornerstone can find the image loader
         url = "wadouri:" + url;
-        // image enable the dicomImage element and activate a few tools
-        var element = document.getElementById('dicomImage');
 
         try {
             var start = new Date().getTime();
@@ -120,6 +164,7 @@ SPDX-License-Identifier: MIT-0 -->
                     cornerstoneTools.rectangleRoi.enable(element);
                     loaded = true;
                 }
+                loadPrevAnnotations();
             }, function(err) {
                 alert(err);
             });
@@ -129,7 +174,6 @@ SPDX-License-Identifier: MIT-0 -->
         }
     }
 
-    var element = document.getElementById('dicomImage');
     cornerstone.enable(element);
 
     document.addEventListener("DOMContentLoaded", function(){

@@ -109,9 +109,32 @@ SPDX-License-Identifier: MIT-0 -->
         if (!prevAnnRaw) return;
         console.log('Previous Annotations:', prevAnnRaw);
         const prevAnnotations = JSON.parse(prevAnnRaw);
+
+        // First the disease checkboxes:
+        try {
+            if (prevAnnotations.disease) {
+                const chkContainer = document.getElementById('labelsSelection');
+                Object.keys(prevAnnotations.disease).forEach((disease) => {
+                    if (prevAnnotations.disease[disease]) {
+                        // querySelector method here assumes no disease label ever contains quote "
+                        const checkbox = chkContainer.querySelector(`input[value="${disease}"]`);
+                        if (checkbox) {
+                            checkbox.setAttribute('checked', null);  // Set checked
+                        } else {
+                            console.warn(
+                                `Previously annotated disease "${disease}" is not in current job.`
+                            );
+                        }
+                    }
+                });
+            }
+        } catch (err) {
+            console.warn("Couldn't load previous disease labels", err);
+        }
+
+        // Then highlighted regions of interest:
         const prevToolData = JSON.parse(prevAnnotations.labels);
         const roi = prevToolData.ROI;
-
         // Need to translate back from saved SMGT annotations to cornerstone tool state:
         let roiToolType;
         let roiData;

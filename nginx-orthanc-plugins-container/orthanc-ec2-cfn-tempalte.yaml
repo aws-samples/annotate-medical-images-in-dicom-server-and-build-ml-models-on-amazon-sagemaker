@@ -1,41 +1,105 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template to deploy Orthanc on AWS
+Description: (WWPS-AMC-ORTHANC) CloudFormation template to deploy Orthanc on AWS
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Namespace
+        Parameters:
+          - Namespace
+      - Label:
+          default: Network Infrastructure
+        Parameters:
+          - ParameterVPCId
+          - PublicSubnet1Id
+          - PublicSubnet2Id
+          - PrivateSubnet1Id
+          - PrivateSubnet2Id
+          - SecurityGroupIngressCIDR
+      - Label:
+          default: ECS
+        Parameters:
+          - ContainerOnEC2
+          - ContainerImageUrl
+          - KeyName
+          - InstanceType
+          - NumberofEC2Instances
+          - NumberofContainers
+          - OrthancContainerCPU
+          - OrthancContainerMemory
+      - Label:
+          default: EFS Persistent Storage
+        Parameters:
+          - EnableEFSBackup
+          - EFSStorageInfrequentAcessAfter
+      - Label:
+          default: RDS Database
+        Parameters:
+          - RDSDBInstanceClass
+          - RDSDBStorageType
+          - RDSDBAllocatedStorage
+          - RDSDBUserName
+          - RDSDBBackupRetentionDays
+          - IsDBMultiAZ
 
 Parameters:
-  ParameterClusterName:
-    Description: Name of the ECS cluster to deploy to (optional)
+  Namespace:
+    Description: A string of 4-20 lowercase letters and digits, starting with a letter. Included in resource names, allowing multiple deployments.
+    Default: orthanc
     Type: String
-  ParameterLoadBalancerARN:
-    Description: Name of the LoadBalancer to connect to (optional)
-    Type: String
-  ConainerImageUrl:
+    AllowedPattern: "^[a-z]{1}[a-z0-9]{3,19}$"
+    ConstraintDescription: Between 4-20 letters and digits, starting with a letter
+  ContainerOnEC2:
+    Type: String 
+    Default: N 
+    Description: Will the containers be hosted on ECS EC2? Y = EC2, N = Fargate
+    AllowedValues: [Y, N]
+  ContainerImageUrl:
     Description: The url of a docker image that contains the application process that will handle the traffic for this service
-    Default: flamingofugang/nginx-orthanc-plugins:latest
+    Default: osimis/orthanc
     Type: String
-  ParameterVPCId:
-    Description: ID of the VPC
-    Type: AWS::EC2::VPC::Id
   PublicSubnet1Id:
     Description: PublicSubnetId, for Availability Zone 1 in the region in your VPC
     Type: AWS::EC2::Subnet::Id
   PublicSubnet2Id:
     Description: PublicSubnetId, for Availability Zone 2 in the region in your VPC
     Type: AWS::EC2::Subnet::Id
-  KeyName:
-    Type: AWS::EC2::KeyPair::KeyName
-    Description: Name of an existing EC2 KeyPair to enable SSH access to the ECS instances.
-  InstanceType:
-    Description: EC2 instance type
+  PrivateSubnet1Id:
+    Description: PrivateSubnetId, for Availability Zone 1 in the region in your VPC
+    Type: AWS::EC2::Subnet::Id
+  PrivateSubnet2Id:
+    Description: PrivateSubnetId, for Availability Zone 2 in the region in your VPC
+    Type: AWS::EC2::Subnet::Id
+  ParameterVPCId:
+    Description: ID of the VPC
+    Type: AWS::EC2::VPC::Id
+  SecurityGroupIngressCIDR:
     Type: String
-    Default: m3.xlarge
-    AllowedValues: [t2.large, m3.large,
-      m3.xlarge, m3.2xlarge, m4.large, m4.xlarge, m4.2xlarge, m4.4xlarge, m4.10xlarge,
-      c4.large, c4.xlarge, c4.2xlarge, c4.4xlarge, c4.8xlarge, c3.large, c3.xlarge,
-      c3.2xlarge, c3.4xlarge, c3.8xlarge, r3.large, r3.xlarge, r3.2xlarge, r3.4xlarge,
-      r3.8xlarge, i2.xlarge, i2.2xlarge, i2.4xlarge, i2.8xlarge]
-    ConstraintDescription: Please choose a valid instance type.
+    Default: '0.0.0.0/0'
+  KeyName:
+    Type: String
+    AllowedPattern: "^.{1,255}$"
+    Default: fargate
+    Description: (Optional, only for EC2 hosts) Name of an existing EC2 KeyPair to enable SSH access to the ECS instances.  For Fargate, use 'fargate'.
+  InstanceType:
+    Description: (Optional, only for EC2 hosts) EC2 instance type.
+    Type: String
+    Default: m4.large
+    AllowedValues: [
+      '',
+      t2.large, t2.xlarge, t2.2xlarge,
+      t3.large, t3.xlarge, t3.2xlarge,
+      m4.large, m4.xlarge, m4.2xlarge, m4.4xlarge, m4.8xlarge,
+      m5.large, m5.xlarge, m5.2xlarge, m5.4xlarge, m5.8xlarge,
+      c4.large, c4.xlarge, c4.2xlarge, c4.4xlarge, c4.8xlarge,
+      c5.large, c5.xlarge, c5.2xlarge, c5.4xlarge, c5.8xlarge,
+      r4.large, r4.xlarge, r4.2xlarge, r4.4xlarge, r4.8xlarge,
+      r5.large, r5.xlarge, r5.2xlarge, r5.4xlarge, r5.8xlarge
+    ]
+    ConstraintDescription: 'Please choose a valid instance type: https://aws.amazon.com/ec2/instance-types/'
   NumberofEC2Instances:
-    Description: Number of EC2 instance to run container in ECS cluster
+    Description: (Optional, only for EC2 hosts) Number of EC2 instance to run container in ECS cluster.
     Type: Number
     Default: 1
   NumberofContainers:
@@ -43,7 +107,7 @@ Parameters:
     Type: Number
     Default: 1
   OrthancContainerCPU:
-    Description: The number of cpu units the Amazon ECS container agent will reserve for the container.
+    Description: The number of CPU units the Amazon ECS container agent will reserve for the container.
     Type: Number
     Default: 2048
     AllowedValues: [256, 512, 1024, 2048, 4096]
@@ -52,11 +116,33 @@ Parameters:
     Type: Number
     Default: 4096
     AllowedValues: [512, 1024, 2048, 3072, 4096, 5120, 6144, 7168, 8192, 9216, 10240, 11264, 12288, 13312, 14336, 15360, 16384, 30720]
-  EFSNameTag:
-    Description: The name of the EFS volume
+  RDSDBInstanceClass:
+    Default: db.t3.medium
+    Description: Database Instance Class. db.r5 instance classes are supported for Aurora PostgreSQL 10.6 or later. db.t3.medium instance class is supported for Aurora PostgreSQL 10.7 or later.
     Type: String
-    MinLength: '1'
-    Default: myEFSvolume
+    AllowedValues: [
+      db.t3.medium,
+      db.r4.large, db.r4.xlarge, db.r4.2xlarge, db.r4.4xlarge, db.r4.8xlarge, db.r4.16xlarge, 
+      db.r5.large, db.r5.xlarge, db.r5.2xlarge, db.r5.4xlarge, db.r5.8xlarge, db.r5.12xlarge, db.r5.16xlarge, db.r5.24xlarge
+    ]
+  RDSDBStorageType:
+    Type: String
+    Default: gp2
+  RDSDBAllocatedStorage:
+    Type: Number
+    Default: 20
+  IsDBMultiAZ:
+    Type: String
+    Default: False
+  RDSDBBackupRetentionDays:
+    Type: Number
+    Default: 30
+    Description: The number of days for which automated backups are retained. Setting this parameter to a positive number (from 1 to 35) enables backups. Setting this parameter to 0 disables automated backups. 
+  RDSDBUserName:
+    Type: String
+    Description: RDS PostgreSQL database username
+    Default: postgres
+    NoEcho: true
   EnableEFSBackup:
     Type: String
     Description: whether enable EFS backup or not. EFS backup has extra associated cost.
@@ -67,8 +153,10 @@ Parameters:
     Description: A value that describes the period of time that a file is not accessed, after which it transitions to the IA storage class.
     Default: AFTER_90_DAYS
     AllowedValues: [AFTER_14_DAYS, AFTER_30_DAYS, AFTER_60_DAYS, AFTER_7_DAYS, AFTER_90_DAYS]
-   
 
+Conditions:
+  runContainerOnEC2: !Equals [!Ref ContainerOnEC2, Y]
+  
 Mappings:
   AWSRegionToAMI:
     us-east-1:
@@ -104,50 +192,106 @@ Mappings:
     sa-east-1:
       AMIID: ami-05313c3a9e9148109
 
-Conditions:
-  CreateCluster: !Equals
-    - ''
-    - !Ref 'ParameterClusterName'
-  CreateLoadBalancer: !Equals
-    - ''
-    - !Ref 'ParameterLoadBalancerARN'
-
 Resources:
   CloudMap:
     Type: AWS::ServiceDiscovery::PrivateDnsNamespace
     Properties:
       Description: Service Map for Docker Compose project orthanconaws
-      Name: orthanconaws.local
-      Vpc: !Ref 'ParameterVPCId'
-  OrthancServiceDiscoveryEntry:
-    Type: AWS::ServiceDiscovery::Service
-    Properties:
-      Description: '"orthanc" service discovery entry in Cloud Map'
-      DnsConfig:
-        DnsRecords:
-          - TTL: 60
-            Type: A
-        RoutingPolicy: MULTIVALUE
-      HealthCheckCustomConfig:
-        FailureThreshold: 1
-      Name: orthanc
-      NamespaceId: !Ref 'CloudMap'
+      Name: !Sub "${Namespace}-orthanconaws.local"
+      Vpc: !Ref ParameterVPCId
 
-  Cluster:
+  ECSCluster:
     Type: AWS::ECS::Cluster
-    Condition: CreateCluster
     Properties:
-      ClusterName: orthanconaws
+      ClusterName: !Sub "${Namespace}-orthanconaws-cluster"
+      ClusterSettings:
+        - Name: containerInsights
+          Value:  enabled
       Tags:
         - Key: project
-          Value: orthanconaws
+          Value: !Sub "${Namespace}-orthanconaws"
+
   LogGroup:
     Properties:
-      LogGroupName: /docker-compose/orthanconaws
+      LogGroupName: !Sub "/docker-compose/${Namespace}-orthanconaws-loggroup"
     Type: AWS::Logs::LogGroup
+
+  RDSDatabaseSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${Namespace}-RDSDatabaseSecret"
+      Description: !Join ['', ['RDS Database Master User Secret ', 'for CloudFormation Stack ', !Ref 'AWS::StackName']]
+      Tags:
+        - Key: project
+          Value: !Sub "${Namespace}-orthanconaws"
+      GenerateSecretString:
+        SecretStringTemplate: !Join ['', ['{"username": "', !Ref RDSDBUserName, '"}']]
+        GenerateStringKey: "password"
+        ExcludeCharacters: '"@/\'
+        PasswordLength: 16
+
+  SMSecretRDSDBAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref RDSDatabaseSecret
+      TargetId: !Ref RDSInstance
+      TargetType: AWS::RDS::DBInstance
+
+  DataBaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub "${Namespace}-dbsubnetgroup"
+      DBSubnetGroupDescription: DBSubnetGroup for Aurora RDS instances
+      SubnetIds:
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+
+  OrthancRDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: OrthancOnAWS RDS Security Group
+      GroupName: !Sub "${Namespace}-OrthancRDSSecurityGroup"
+      SecurityGroupIngress:
+        - CidrIp: '0.0.0.0/0'
+          Description: postgres:5432/tcp
+          FromPort: 5432
+          IpProtocol: TCP
+          ToPort: 5432
+      Tags:
+        - Key: project
+          Value: !Sub "${Namespace}-orthanconaws"
+        - Key: com.docker.compose.network
+          Value: rds
+      VpcId: !Ref ParameterVPCId
+
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub "${Namespace}-orthanc-instance"
+      DBName: !Sub "${Namespace}OrthancDB"
+      DBInstanceClass: !Ref RDSDBInstanceClass
+      StorageType: !Ref RDSDBStorageType
+      StorageEncrypted: True
+      AllocatedStorage: !Ref RDSDBAllocatedStorage
+      Engine: postgres
+      EngineVersion: '11'
+      MasterUsername: !Ref RDSDBUserName
+      MasterUserPassword: !Join ['', ['{{resolve:secretsmanager:', !Ref RDSDatabaseSecret, ':SecretString:password}}' ]]
+      PubliclyAccessible: False
+      MultiAZ: !Ref IsDBMultiAZ
+      Tags:
+        - Key: project
+          Value: !Sub "${Namespace}-orthanconaws"
+      VPCSecurityGroups: 
+        - !Ref OrthancRDSSecurityGroup
+      DBSubnetGroupName: !Ref DataBaseSubnetGroup
+      BackupRetentionPeriod: !Ref RDSDBBackupRetentionDays
 
   FileSystem:
     Type: AWS::EFS::FileSystem
+    DeletionPolicy: Snapshot
     Properties:
       Encrypted: True
       BackupPolicy: 
@@ -156,21 +300,24 @@ Resources:
         - TransitionToIA: !Ref EFSStorageInfrequentAcessAfter
       FileSystemTags:
         - Key: Name
-          Value: !Ref 'EFSNameTag'
+          Value: !Sub "${Namespace}-orthanc-efs"
+
   MountTarget1:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref FileSystem
-      SubnetId: !Ref 'PublicSubnet1Id'
+      SubnetId: !Ref PrivateSubnet1Id
       SecurityGroups:
-        - !Ref 'OrthancEFSNetwork'
+        - !Ref OrthancEFSNetwork
+
   MountTarget2:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref FileSystem
-      SubnetId: !Ref 'PublicSubnet2Id'
+      SubnetId: !Ref PrivateSubnet2Id
       SecurityGroups:
-        - !Ref 'OrthancEFSNetwork'
+        - !Ref OrthancEFSNetwork
+
   NFSAccessPoint:
     Type: AWS::EFS::AccessPoint
     Properties: 
@@ -185,152 +332,247 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: OrthancOnAWS default Security Group
-      GroupName: OrthancServerNetwork
+      GroupName: !Sub "${Namespace}-OrthancServerNetwork"
       SecurityGroupIngress:
-        - CidrIp: '0.0.0.0/0'
-          Description: nginx:443/tcp
-          FromPort: 443
+        - CidrIp: !Ref SecurityGroupIngressCIDR
+          Description: orthanc:4242/tcp
           IpProtocol: TCP
-          ToPort: 443
-        - CidrIp: '0.0.0.0/0'
+          FromPort: 4242
+          ToPort: 4242
+        - CidrIp: !Ref SecurityGroupIngressCIDR
+          Description: orthanc:80/tcp
+          IpProtocol: TCP
+          FromPort: 80
+          ToPort: 80
+        - CidrIp: !Ref SecurityGroupIngressCIDR
           Description: ssh:22/tcp
-          FromPort: 22
           IpProtocol: TCP
+          FromPort: 22
           ToPort: 22
       Tags:
         - Key: project
-          Value: orthanconaws
-      VpcId: !Ref 'ParameterVPCId'
+          Value: !Sub "${Namespace}-orthanconaws"
+        - Key: com.docker.compose.network
+          Value: default
+      VpcId: !Ref ParameterVPCId
+
   OrthancServerNetworkIngress:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       Description: Allow communication within network default
-      GroupId: !Ref 'OrthancServerNetwork'
+      GroupId: !Ref OrthancServerNetwork
       IpProtocol: '-1'
-      SourceSecurityGroupId: !Ref 'OrthancServerNetwork'
+      SourceSecurityGroupId: !Ref OrthancServerNetwork
+
   OrthancEFSNetwork:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Orthanc EFS Security Group
-      GroupName: OrthancEFSNetwork
+      GroupName: !Sub "${Namespace}-OrthancEFSNetwork"
       SecurityGroupIngress:
-        - SourceSecurityGroupId: !Ref 'OrthancServerNetwork'
+        - SourceSecurityGroupId: !Ref OrthancServerNetwork
           Description: efs:2049/tcp
           FromPort: 2049
           IpProtocol: TCP
           ToPort: 2049
       Tags:
         - Key: project
-          Value: orthanc-on-aws
-      VpcId: !Ref 'ParameterVPCId'
+          Value: !Sub "${Namespace}-orthanconaws"
+        - Key: network
+          Value: efs
+      VpcId: !Ref ParameterVPCId
 
-  orthanconawsLoadBalancer:
+  OrthancALBLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Condition: CreateLoadBalancer
     Properties:
-      Name: orthanconawsLoadBalancer
+      Name: !Sub "${Namespace}-alb"
       Scheme: internet-facing
       Subnets:
-        - !Ref 'PublicSubnet1Id'
-        - !Ref 'PublicSubnet2Id'
+        - !Ref PublicSubnet1Id
+        - !Ref PublicSubnet2Id
+      SecurityGroups:
+        - !Ref OrthancServerNetwork
+      Tags:
+      - Key:  project
+        Value: !Sub "${Namespace}-orthanconaws"
+      Type: application
+
+  OrthancNLBLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${Namespace}-nlb"
+      Scheme: internet-facing
+      Subnets:
+        - !Ref PublicSubnet1Id
+        - !Ref PublicSubnet2Id
       Tags:
         - Key: project
-          Value: orthanconaws
+          Value: !Sub "${Namespace}-orthanconaws"
       Type: network
 
   OrthancService:
     Type: AWS::ECS::Service
     DependsOn:
-      - OrthancTCP443Listener
+      - Orthanc80Listener
+      - Orthanc4242Listener
     Properties:
-      Cluster: !If
-        - CreateCluster
-        - !Ref 'Cluster'
-        - !Ref 'ParameterClusterName'
+      Cluster: !Ref ECSCluster
       DeploymentConfiguration:
         MaximumPercent: 200
         MinimumHealthyPercent: 100
       DeploymentController:
         Type: ECS
       DesiredCount: !Ref NumberofContainers
-      LaunchType: EC2
+      LaunchType: !If [runContainerOnEC2, 'EC2', 'FARGATE']
+      EnableExecuteCommand: true
       LoadBalancers:
-        - ContainerName: orthanc
-          ContainerPort: 443
-          TargetGroupArn: !Ref 'OrthancTCP443TargetGroup'
+        - ContainerName: !Sub "${Namespace}-orthanc-container"
+          ContainerPort: 8042
+          TargetGroupArn: !Ref Orthanc8042TargetGroup
+        - ContainerName: !Sub "${Namespace}-orthanc-container"
+          ContainerPort: 4242
+          TargetGroupArn: !Ref Orthanc4242TargetGroup
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
+          AssignPublicIp: 'DISABLED'
           SecurityGroups:
-            - !Ref 'OrthancServerNetwork'
+            - !Ref OrthancServerNetwork
           Subnets:
-            - !Ref 'PublicSubnet1Id'
-            - !Ref 'PublicSubnet2Id'
+            - !Ref PrivateSubnet1Id
+            - !Ref PrivateSubnet2Id
       PropagateTags: SERVICE
       SchedulingStrategy: REPLICA
+      ServiceName: !Sub "${Namespace}-orthanc-service"
       ServiceRegistries:
-        - RegistryArn: !GetAtt 'OrthancServiceDiscoveryEntry.Arn'
+        - RegistryArn: !GetAtt OrthancServiceDiscoveryEntry.Arn
       Tags:
         - Key: project
-          Value: orthanconaws
-      TaskDefinition: !Ref 'OrthancTaskDefinition'
-  OrthancTCP443Listener:
+          Value: !Sub "${Namespace}-orthanconaws"
+        - Key: com.docker.compose.service
+          Value: orthanc
+      TaskDefinition: !Ref OrthancTaskDefinition
+
+  OrthancServiceDiscoveryEntry:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Description: '"orthanc" service discovery entry in Cloud Map'
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        RoutingPolicy: MULTIVALUE
+      Name: !Sub "${Namespace}-orthanc-sdservice"
+      NamespaceId: !Ref CloudMap
+
+  Orthanc80Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - ForwardConfig:
             TargetGroups:
-              - TargetGroupArn: !Ref 'OrthancTCP443TargetGroup'
+              - TargetGroupArn: !Ref Orthanc8042TargetGroup
           Type: forward
-      LoadBalancerArn: !If
-        - CreateLoadBalancer
-        - !Ref 'orthanconawsLoadBalancer'
-        - !Ref 'ParameterLoadBalancerARN'
-      Port: 443
-      Protocol: TCP
-  OrthancTCP443TargetGroup:
+      LoadBalancerArn: !Ref OrthancALBLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  Orthanc8042TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Port: 443
+      Port: 8042
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref ParameterVPCId
+      HealthCheckEnabled: true
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 8042
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: 200-499
+      TargetGroupAttributes:
+        - Key: stickiness.enabled
+          Value: true
+        - Key: stickiness.type
+          Value: lb_cookie
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: 86500
+      Tags:
+        - Key: project
+          Value: !Sub "${Namespace}-orthanconaws"
+
+  Orthanc4242Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref Orthanc4242TargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref OrthancNLBLoadBalancer
+      Port: 4242
+      Protocol: TCP
+
+  Orthanc4242TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 4242
       Protocol: TCP
       Tags:
         - Key: project
-          Value: orthanconaws
+          Value: !Sub "${Namespace}-orthanconaws"
       TargetType: ip
-      VpcId: !Ref 'ParameterVPCId'
+      VpcId: !Ref ParameterVPCId
+
   OrthancTaskDefinition:
     Type: AWS::ECS::TaskDefinition
+    DependsOn:
+      - RDSInstance
     Properties:
       ContainerDefinitions:
         - Environment:
+            - Name: ORTHANC__POSTGRESQL__HOST
+              Value: !GetAtt 'RDSInstance.Endpoint.Address'
+            - Name: ORTHANC__POSTGRESQL__PORT
+              Value: !GetAtt 'RDSInstance.Endpoint.Port'
+            - Name: ORTHANC__POSTGRESQL__USERNAME
+              Value: !Ref RDSDBUserName
+            - Name: ORTHANC__POSTGRESQL__PASSWORD
+              Value: !Join ['', ['{{resolve:secretsmanager:', !Ref RDSDatabaseSecret, ':SecretString:password}}' ]]
             - Name: LOCALDOMAIN
               Value: !Join
                 - ''
-                - - !Ref 'AWS::Region'
+                - - !Ref AWS::Region
                   - .compute.internal
-                  - ' orthanconaws.local'
+                  - ' '
+                  - !Sub "${Namespace}-orthanconaws.local"
+            - Name: ORTHANC_JSON
+              Value: !Sub '{"Name": "orthanc-file-in-env-var", "AuthenticationEnabled": false}'
+            - Name: DICOM_WEB_PLUGIN_ENABLED
+              Value: 'true'
+            - Name: WSI_PLUGIN_ENABLED
+              Value: 'true'
           Essential: true
-          Image: !Ref 'ConainerImageUrl'
-          LinuxParameters: {}
+          Image: !Ref ContainerImageUrl
+          LinuxParameters: { InitProcessEnabled: true }
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Ref 'LogGroup'
+              awslogs-group: !Ref LogGroup
               awslogs-region: !Ref 'AWS::Region'
               awslogs-stream-prefix: orthanconaws
-          Name: orthanc
+          Name: !Sub "${Namespace}-orthanc-container"
           MountPoints:
             - ContainerPath: /var/lib/orthanc/db
-              SourceVolume: my-efs
+              SourceVolume: !Sub "${Namespace}-orthanc-efs"
           PortMappings:
+            - ContainerPort: 4242
+              HostPort: 4242
+              Protocol: tcp
             - ContainerPort: 8042
               HostPort: 8042
               Protocol: tcp
-            - ContainerPort: 443
-              HostPort: 443
-              Protocol: tcp
       Volumes:
-        - name: my-efs
+        - Name: !Sub "${Namespace}-orthanc-efs"
           EFSVolumeConfiguration: 
             FilesystemId: !GetAtt 'FileSystem.FileSystemId'
             TransitEncryption: ENABLED
@@ -339,15 +581,17 @@ Resources:
               IAM: ENABLED
       Cpu: !Ref OrthancContainerCPU
       Memory: !Ref OrthancContainerMemory
-      ExecutionRoleArn: !Ref 'OrthancTaskExecutionRole'
-      TaskRoleArn: !Ref 'OrthancTaskRole'
+      ExecutionRoleArn: !Ref OrthancTaskExecutionRole
+      TaskRoleArn: !Ref OrthancTaskRole
       Family: orthanconaws-orthanc
       NetworkMode: awsvpc
       RequiresCompatibilities:
-        - EC2
+        - !If [runContainerOnEC2, 'EC2', 'FARGATE']
+
   OrthancTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub "${Namespace}-orthanctaskexecutionrole"
       AssumeRolePolicyDocument:
         Statement:
           - Action:
@@ -359,9 +603,11 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+
   OrthancTaskRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub "${Namespace}-orthanctaskrole"
       AssumeRolePolicyDocument:
         Statement:
           - Action:
@@ -370,42 +616,118 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
         Version: '2012-10-17'
+      Policies:
+        - PolicyName: SSMPolicy
+          PolicyDocument:
+            Statement:
+              - Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                Effect: Allow
+                Resource: "*"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonElasticFileSystemFullAccess
+
   ECSAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
+    Condition: runContainerOnEC2
     Properties:
+      AutoScalingGroupName: !Sub "${Namespace}-ecsautoscalinggroup"
       VPCZoneIdentifier:
-        - !Ref 'PublicSubnet1Id'
-        - !Ref 'PublicSubnet2Id'
-      LaunchConfigurationName: !Ref 'ContainerInstances'
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+      LaunchConfigurationName: !Ref ContainerInstances
       MinSize: '1'
       MaxSize: '2'
       DesiredCapacity: !Ref NumberofEC2Instances
+      Tags:
+        - Key: Name
+          PropagateAtLaunch: true
+          Value: !Sub "${Namespace}-ecs-instance"
     CreationPolicy:
       ResourceSignal:
         Timeout: PT15M
     UpdatePolicy:
       AutoScalingReplacingUpdate:
-        WillReplace: 'true'
+        WillReplace: true
+
   ContainerInstances:
     Type: AWS::AutoScaling::LaunchConfiguration
+    Condition: runContainerOnEC2
     Properties:
       ImageId: !FindInMap [AWSRegionToAMI, !Ref 'AWS::Region', AMIID]
       SecurityGroups:
-            - !Ref 'OrthancServerNetwork'
-      InstanceType: !Ref 'InstanceType'
-      IamInstanceProfile: !Ref 'EC2InstanceProfile'
-      KeyName: !Ref 'KeyName'
+            - !Ref OrthancServerNetwork
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      KeyName: !If [runContainerOnEC2, !Ref KeyName, !Ref 'AWS::NoValue']
+      LaunchConfigurationName: !Sub "${Namespace}-orthanc-launchconfig"
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          echo ECS_CLUSTER=${Cluster} >> /etc/ecs/ecs.config
-          yum install -y aws-cfn-bootstrap
+          echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
+          yum install -y aws-cfn-bootstrap bzip2 unzip git jq wget telnet java-11-amazon-corretto-headless
           /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ECSAutoScalingGroup --region ${AWS::Region}
+          amazon-linux-extras install postgresql11 -y
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"  
+          unzip awscliv2.zip  
+          ./aws/install
+          wget https://sourceforge.net/projects/dcm4che/files/dcm4che3/5.23.2/dcm4che-5.23.2-bin.zip -P /tmp
+
+          # Configure and enable Amazon Cloudwatch Agent
+          yum install -y amazon-cloudwatch-agent
+          instance_id=`curl -s http://169.254.169.254/latest/meta-data/instance-id/`
+          cat <<EOF > /opt/aws/amazon-cloudwatch-agent/etc/cloudwatch-config.json
+            {
+              "agent": {
+                "logfile": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log"
+              },
+              "logs": {
+                "logs_collected": {
+                  "files": {
+                    "collect_list": [
+                      {
+                        "file_path": "/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log",
+                        "log_group_name": "/aws/ecs/container-instance/${Namespace}",
+                        "log_stream_name": "/aws/ecs/container-instance/${Namespace}/$instance_id/amazon-cloudwatch-agent.log"
+                      },
+                      {
+                        "file_path": "/var/log/cloud-init.log",
+                        "log_group_name": "/aws/ecs/container-instance/${Namespace}",
+                        "log_stream_name": "/aws/ecs/container-instance/${Namespace}/$instance_id/cloud-init.log"
+                      },
+                      {
+                        "file_path": "/var/log/cloud-init-output.log",
+                        "log_group_name": "/aws/ecs/container-instance/${Namespace}",
+                        "log_stream_name": "/aws/ecs/container-instance/${Namespace}/$instance_id/cloud-init-output.log"
+                      },
+                      {
+                        "file_path": "/var/log/ecs/ecs-init.log",
+                        "log_group_name": "/aws/ecs/container-instance/${Namespace}",
+                        "log_stream_name": "/aws/ecs/container-instance/${Namespace}/$instance_id/ecs-init.log"
+                      },
+                      {
+                        "file_path": "/var/log/ecs/ecs-agent.log",
+                        "log_group_name": "/aws/ecs/container-instance/${Namespace}",
+                        "log_stream_name": "/aws/ecs/container-instance/${Namespace}/$instance_id/ecs-agent.log"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          EOF
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/cloudwatch-config.json
+          systemctl enable amazon-cloudwatch-agent
+          systemctl start amazon-cloudwatch-agent
+
   EC2Role:
     Type: AWS::IAM::Role
+    Condition: runContainerOnEC2
     Properties:
+      RoleName: !Sub "${Namespace}-ec2role"
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -418,19 +740,205 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: !Sub "${Namespace}-ecs-instance-logging-policy"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Resource: "arn:aws:logs:*:*:*"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "logs:DescribeLogStreams"      
+
   EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
+    Condition: runContainerOnEC2
     Properties:
+      InstanceProfileName: !Sub "${Namespace}-instanceprofile"      
       Path: /
-      Roles: [!Ref 'EC2Role']
+      Roles: [!Ref EC2Role]
+
+  CloudFrontDistribution:
+    Type: 'AWS::CloudFront::Distribution'
+    DependsOn:
+      - LambdaEdgeViewerRequestFunction
+      - LambdaEdgeViewerResponseFunction
+    Properties:
+      DistributionConfig:
+        Comment: 'Cloudfront Distribution pointing ALB Origin'
+        Origins:
+          - DomainName: !GetAtt 'OrthancALBLoadBalancer.DNSName'
+            Id: !Ref 'OrthancALBLoadBalancer'
+            CustomOriginConfig:
+              HTTPPort: '80'
+              OriginProtocolPolicy: 'http-only'
+              OriginSSLProtocols:
+                - TLSv1
+                - TLSv1.1
+                - TLSv1.2
+                - SSLv3
+        Enabled: true
+        HttpVersion: 'http2'
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - DELETE
+            - OPTIONS
+            - PATCH
+            - POST
+            - PUT
+          CachedMethods:
+            - GET 
+            - HEAD
+          Compress: 'false'
+          SmoothStreaming: 'false'
+          TargetOriginId: !Ref 'OrthancALBLoadBalancer'
+          ForwardedValues:
+            QueryString: 'true'
+            Cookies:
+              Forward: 'all'
+            Headers:
+              - 'Authorization'
+              - 'Origin'
+              - 'Host'
+              - 'Access-Control-Request-Headers'
+              - 'Access-Control-Request-Method'
+          ViewerProtocolPolicy: 'allow-all'
+          LambdaFunctionAssociations:
+            - EventType: 'viewer-response'
+              LambdaFunctionARN: !Ref 'LambdaEdgeViewerResponseVersion'
+            - EventType: 'viewer-request'
+              LambdaFunctionARN: !Ref 'LambdaEdgeViewerRequestVersion'
+        PriceClass: 'PriceClass_All'
+
+  # LAMBDA@EDGE FUNCTION
+  LambdaEdgeViewerRequestFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Description: !Sub 'A custom Lambda@Edge function for serving custom headers from CloudFront Distribution'
+      FunctionName: !Sub '${Namespace}-lambda-at-edge-viewer-request'
+      Handler: index.handler
+      Role: !GetAtt 'LambdaEdgeIAMRole.Arn'
+      MemorySize: 128
+      Timeout: 5
+      Code:
+        ZipFile: !Sub |
+          'use strict';
+           exports.handler = (event, context, callback) => {
+            const request = event.Records[0].cf.request;
+
+            if (request.method === 'OPTIONS') {
+              const response = {
+                status: '200',
+                statusDescription: 'OK',
+                headers: {
+                  'access-control-allow-credentials': [{
+                      key: 'Access-Control-Allow-Credentials',
+                      value: 'true'
+                  }],
+                  'access-control-allow-origin': [{
+                      key: 'Access-Control-Allow-Origin',
+                      value: '*'
+                  }],
+                  'access-control-allow-headers': [{
+                      key: 'Access-Control-Allow-Headers',
+                      value: '*'
+                  }],
+                  'access-control-allow-methods': [{
+                      key: 'Access-Control-Allow-Methods',
+                      value: '*'
+                  }]
+                }
+              };
+              callback(null, response);
+            } else {
+              callback(null, request);
+            }
+          };
+      Runtime: nodejs14.x
+
+  # LAMBDA@EDGE FUNCTION
+  LambdaEdgeViewerResponseFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Description: !Sub 'A custom Lambda@Edge function for serving custom headers from CloudFront Distribution'
+      FunctionName: !Sub '${Namespace}-lambda-at-edge-viewer-response'
+      Handler: index.handler
+      Role: !GetAtt 'LambdaEdgeIAMRole.Arn'
+      MemorySize: 128
+      Timeout: 5
+      Code:
+        ZipFile: !Sub |
+          'use strict';
+           exports.handler = (event, context, callback) => {
+            const response = event.Records[0].cf.response;
+            response.headers['access-control-allow-credentials'] = [{"key": "Access-Control-Allow-Credentials","value": "true"}];
+            response.headers['access-control-allow-origin'] = [{"key": "Access-Control-Allow-Origin","value": "*"}];
+            response.headers['access-control-allow-headers'] = [{"key": "Access-Control-Allow-Headers","value": "*"}];
+            response.headers['access-control-allow-methods'] = [{"key": "Access-Control-Allow-Methods","value": "*"}];
+            callback(null, response);
+          };
+      Runtime: nodejs14.x
+
+  LambdaEdgeViewerRequestVersion:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref LambdaEdgeViewerRequestFunction
+      Description: !Sub "viewer request for ${OrthancALBLoadBalancer}"
+
+  LambdaEdgeViewerResponseVersion:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref LambdaEdgeViewerResponseFunction
+      Description: !Sub "viewer response for ${OrthancALBLoadBalancer}"
 
 
+# IAM ROLE USED FOR LAMBDA EDGE
+  LambdaEdgeIAMRole:
+    Type: 'AWS::IAM::Role'
+    Description: "Lambda Edge IAM Role"
+    Properties:
+      RoleName: !Sub "${Namespace}-iam-lambda-edge-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowLambdaServiceToAssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+                - edgelambda.amazonaws.com
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+      Path: /
+      Policies:
+        - PolicyName: PublishNewLambdaEdgeVersion
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - lambda:PublishVersion
+              Resource: '*'
+        
 Outputs:
-  OrthancNginxEndpoint:
-    Description: The URL for Nginx reverse proxy of Orthanc web server endpoint
+  CloudFrontEndpoint:
+    Description: "Endpoint for Cloudfront Distribution"
     Value: !Join
       - ''
       - - 'https://'
-        - !GetAtt orthanconawsLoadBalancer.DNSName
+        - !GetAtt 'CloudFrontDistribution.DomainName'
+  OrthancALBEndpoint:
+    Description: The URL of the reverse proxy for Orthanc web server endpoint
+    Value: !Sub "http://${OrthancALBLoadBalancer.DNSName}" 
+  OrthancNLBEndpoint:
+    Description: The URL of the reverse proxy for Orthanc web server endpoint
+    Value: !Sub "http://${OrthancNLBLoadBalancer.DNSName}:4242" 
 
-      

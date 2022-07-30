@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: AWS CloudFormation to deploy SageMaker annotations and modeling resources
 Parameters:
-  PreLabelLambdaSourceEndpointURL:
+  CloudFrontEndpoint:
     Type: String 
     Description: The Endpoint URL of PACS used by PreLabel Lambda function that will be used to construct the source of DICOM image
   NotebookInstanceName:
@@ -63,8 +63,6 @@ Resources:
         Status: Enabled
   SMGTLabelingExecutionRole:
     Type: AWS::IAM::Role
-    DependsOn:
-      - ConsolidationLambdaSMGTExecutionRole
     Properties:
       RoleName: !Sub SMGTLabelingExecutionRole-${AWS::AccountId}
       AssumeRolePolicyDocument:
@@ -74,12 +72,6 @@ Resources:
             Principal:
               Service:
                 - sagemaker.amazonaws.com
-            Action:
-              - sts:AssumeRole
-          - Effect: Allow
-            Principal:
-              AWS:
-                - !GetAtt 'ConsolidationLambdaSMGTExecutionRole.Arn'
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
@@ -161,11 +153,11 @@ Resources:
       FunctionName: gt-prelabel-task-lambda
       Timeout: 60
       Handler: index.lambda_handler
-      Runtime: python3.6
+      Runtime: python3.8
       MemorySize: 128
       Environment:
         Variables:
-          EndpointURL: !Ref PreLabelLambdaSourceEndpointURL
+          EndpointURL: !Ref CloudFrontEndpoint
   PostLabelTaskLambda:
     Type: AWS::Lambda::Function
     DependsOn:
@@ -175,8 +167,7 @@ Resources:
         ZipFile: |
             import json
             import sys
-            from botocore.exceptions import ClientError
-            import boto3
+            from s3_helper import S3Client
             def lambda_handler(event, context):
                 print(json.dumps(event, indent=2))
                 labeling_job_arn = event["labelingJobArn"]
@@ -244,62 +235,11 @@ Resources:
                 print(consolidated_output)
                 print(" ------------------------- ")
                 return consolidated_output
-            class S3Client(object):
-              s3_client = boto3.client("s3")
-              s3 = boto3.resource("s3")
-
-              def __init__(self, role_arn=None, kms_key_id=None):
-                  DEFAULT_SESSION = "Custom_Annotation_Consolidation_Lambda_Session"
-                  sts_connection = boto3.client('sts')
-                  assume_role_object = sts_connection.assume_role(RoleArn=role_arn, RoleSessionName=DEFAULT_SESSION)
-                  session = boto3.Session(
-                      aws_access_key_id=assume_role_object['Credentials']['AccessKeyId'],
-                      aws_secret_access_key=assume_role_object['Credentials']['SecretAccessKey'],
-                      aws_session_token=assume_role_object['Credentials']['SessionToken'])
-                  self.s3 = session.resource('s3')
-                  self.s3_client = session.client('s3')
-                  self.kms_key_id = kms_key_id
-
-              def put_object_to_s3(self, data, bucket, key, content_type):
-                  try:
-                      if not content_type:
-                          # Default content type
-                          content_type = "application/octet-stream"
-                      image_object = self.s3.Object(bucket, key)
-                      if self.kms_key_id:
-                          image_object.put(Body=data, ContentType=content_type, SSEKMSKeyId=self.kms_key_id,
-                                           ServerSideEncryption="aws:kms")
-                      else:
-                          image_object.put(Body=data, ContentType=content_type)
-                  except ClientError as e:
-                      raise ValueError("Failed to put data in bucket: {}  with key {}.".format(bucket, key), e)
-                  return "s3://" + image_object.bucket_name + "/" + image_object.key
-
-              def get_object_from_s3(self, s3_url):
-                  bucket, path = S3Client.bucket_key_from_s3_uri(s3_url)
-
-                  try:
-                      payload = self.s3_client.get_object(Bucket=bucket, Key=path).get('Body').read().decode('utf-8')
-                  except ClientError as e:
-                      print(e)
-                      if e.response['Error']['Code'] == "404" or e.response['Error']['Code'] == 'NoSuchKey':
-                          return None
-                      else:
-                          raise ValueError("Failed to retrieve data from {}.".format(s3_url), e)
-
-                  return payload
-              @staticmethod
-              def bucket_key_from_s3_uri(s3_path):
-                  path_parts = s3_path.replace("s3://", "").split("/")
-                  bucket = path_parts.pop(0)
-                  key = "/".join(path_parts)
-
-                  return bucket, key
       Role: !GetAtt 'ConsolidationLambdaSMGTExecutionRole.Arn'
       FunctionName: gt-postlabel-task-lambda
       Timeout: 60
       Handler: index.lambda_handler
-      Runtime: python3.6
+      Runtime: python3.8
       MemorySize: 128
   SageMakerAPIExecutionRole:
     Type: AWS::IAM::Role
